@@ -49,6 +49,9 @@ namespace SugarRush
         [HideInInspector] public float Steer;
         [HideInInspector] public bool DriftHeld;
 
+        /// <summary>When set (e.g. by RaceProgress), Respawn() delegates to it instead of the safe-point history.</summary>
+        public System.Action RespawnOverride;
+
         public float ForwardSpeed { get; private set; }
         public float Speed => rb ? rb.linearVelocity.magnitude : 0f;
         public bool IsGrounded { get; private set; }
@@ -250,6 +253,7 @@ namespace SugarRush
         /// </summary>
         public void Respawn()
         {
+            if (RespawnOverride != null) { RespawnOverride(); return; }
             var (position, rotation) = safePoints.Count > 0 ? safePoints.Peek() : (spawnPosition, spawnRotation);
             safePoints.Clear();
             safePoints.Enqueue((position, rotation));

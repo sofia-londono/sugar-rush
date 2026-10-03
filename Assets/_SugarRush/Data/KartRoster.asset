@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9fd7bb68ae9def48863b13242d5ccab, type: 3}
+  m_Name: KartRoster
+  m_EditorClassIdentifier: Assembly-CSharp::SugarRush.KartRoster
+  karts:
+  - id: Vanellope
+    displayName: Vanellope von Schweetz
+    prefab: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+    color: {r: 0.55, g: 0.85, b: 0.75, a: 1}
+    speed: 0.5555556
+    acceleration: 0.7
+    handling: 0.75
+  - id: Taffyta
+    displayName: Taffyta Muttonfudge
+    prefab: {fileID: 3527243718002122580, guid: 0d04d8c548f144d4a9b392f6aabf6aae, type: 3}
+    color: {r: 1, g: 0.55, b: 0.78, a: 1}
+    speed: 0.8888889
+    acceleration: 0.2
+    handling: 0.21875
+  - id: Adorabeezle
+    displayName: Adorabeezle Winterpop
+    prefab: {fileID: 1048769069955946598, guid: 1c7970039abc8644688134c9d737f8f2, type: 3}
+    color: {r: 0.56, g: 0.82, b: 1, a: 1}
+    speed: 0.33333334
+    acceleration: 0.9
+    handling: 0.9375
+  - id: Rancis
+    displayName: Rancis Fluggerbutter
+    prefab: {fileID: 3815348446234820329, guid: 68e4e9ad015d5864c9fbeaf25905f922, type: 3}
+    color: {r: 1, g: 0.85, b: 0.45, a: 1}
+    speed: 0.7777778
+    acceleration: 0.4
+    handling: 0.375
+  - id: Candlehead
+    displayName: Candlehead
+    prefab: {fileID: 7925114480421620970, guid: a4edab2196df154458a4d375e79d5756, type: 3}
+    color: {r: 0.76, g: 0.64, b: 1, a: 1}
+    speed: 0.44444445
+    acceleration: 0.8
+    handling: 0.625

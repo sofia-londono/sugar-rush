@@ -3,12 +3,15 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UIElements;
 
 namespace SugarRush.EditorTools
 {
     /// <summary>
-    /// One-click builders for the imported Sketchfab assets: kart materials and prefabs,
-    /// track import settings, and the playable track scene.
+    /// One-click builders for the imported Sketchfab assets: kart materials, prefabs and roster,
+    /// track import settings, the race scene and the main menu scene.
     /// </summary>
     public static class SugarRushSetup
     {
@@ -17,25 +20,61 @@ namespace SugarRush.EditorTools
         const string KartTextures = Root + "/Art/Karts/Textures";
         const string TrackFbx = Root + "/Art/Track/map_tgsd.fbx";
         const string TrackTextures = Root + "/Art/Track/Textures";
+        const string GeneratedDir = Root + "/Art/Generated";
         const string MaterialsDir = Root + "/Materials";
         const string PrefabsDir = Root + "/Prefabs";
-        const string ScenePath = Root + "/Scenes/SugarRush_Track.unity";
+        const string DataDir = Root + "/Data";
+        const string UIDir = Root + "/UI";
+        const string RosterPath = DataDir + "/KartRoster.asset";
+        const string PanelSettingsPath = UIDir + "/PanelSettings.asset";
+        const string RaceScenePath = Root + "/Scenes/" + SceneNames.Race + ".unity";
+        const string MenuScenePath = Root + "/Scenes/" + SceneNames.MainMenu + ".unity";
 
         public const float TrackScale = 40f;
         const string RoadColliderMesh = "raod_tgsd_001";
         const string MiniMapMesh = "mini_map_road";
         const string SkyMesh = "sky_tgsd";
         const int IgnoreRaycastLayer = 2;
+        const float RoadHalfWidth = 5f;
+        const float PathSpacing = 4f;
 
-        // Node suffix in the FBX -> character, texture prefix, FBX material names (body, spoiler, wheel)
-        static readonly (string name, string suffix, string tex, string body, string spoiler, string wheel)[] Karts =
+        // Node suffix in the FBX -> character, texture prefix, FBX material names, stats (max speed, acceleration, turn rate)
+        static readonly (string name, string fullName, string suffix, string tex, string body, string spoiler, string wheel,
+            float speed, float accel, float turn, Color color)[] Karts =
         {
-            ("Vanellope",   "",     "vanellope",   "Material.015", "Material.014", "Material.013"),
-            ("Taffyta",     ".001", "taffyta",     "Material.005", "Material.016", "Material.006"),
-            ("Adorabeezle", ".002", "adorableeze", "Material.001", "Material.002", "Material.003"),
-            ("Rancis",      ".003", "rancis",      "Material.007", "Material.009", "Material.008"),
-            ("Candlehead",  ".004", "candlehead",  "Material.010", "Material.011", "Material.012"),
+            ("Vanellope",   "Vanellope von Schweetz", "",     "vanellope",   "Material.015", "Material.014", "Material.013", 28.5f, 16.5f, 132f, new Color(0.55f, 0.85f, 0.75f)),
+            ("Taffyta",     "Taffyta Muttonfudge",    ".001", "taffyta",     "Material.005", "Material.016", "Material.006", 30.0f, 14.0f, 115f, new Color(1.00f, 0.55f, 0.78f)),
+            ("Adorabeezle", "Adorabeezle Winterpop",  ".002", "adorableeze", "Material.001", "Material.002", "Material.003", 27.5f, 17.5f, 138f, new Color(0.56f, 0.82f, 1.00f)),
+            ("Rancis",      "Rancis Fluggerbutter",   ".003", "rancis",      "Material.007", "Material.009", "Material.008", 29.5f, 15.0f, 120f, new Color(1.00f, 0.85f, 0.45f)),
+            ("Candlehead",  "Candlehead",             ".004", "candlehead",  "Material.010", "Material.011", "Material.012", 28.0f, 17.0f, 128f, new Color(0.76f, 0.64f, 1.00f)),
         };
+        const float MinSpeed = 26f, MaxSpeed = 30.5f, MinAccel = 13f, MaxAccel = 18f, MinTurn = 108f, MaxTurn = 140f;
+
+        // Racing line traced over a top-down render of the road meshes (world XZ at TrackScale = 40),
+        // starting at the start line and following the floor arrows. Each point is snapped to the
+        // centre of the minimap road strip, smoothed and resampled.
+        static readonly Vector2[] Route =
+        {
+            new(15.2f, -75.1f), new(-2.1f, -74.2f), new(-9.0f, -70.8f), new(-14.1f, -65.0f), new(-20.1f, -56.2f), new(-26.3f, -55.7f),
+            new(-34.4f, -60.4f), new(-43.6f, -64.5f), new(-52.9f, -66.1f), new(-61.0f, -62.7f), new(-65.6f, -54.6f), new(-63.3f, -45.4f),
+            new(-56.3f, -35.0f), new(-47.1f, -25.7f), new(-39.0f, -20.0f), new(-36.3f, -13.0f), new(-41.3f, -8.4f), new(-50.6f, -8.0f),
+            new(-62.1f, -11.4f), new(-73.7f, -15.3f), new(-85.2f, -20.0f), new(-95.6f, -25.7f), new(-106.0f, -31.5f), new(-117.5f, -31.5f),
+            new(-126.8f, -23.4f), new(-130.2f, -13.0f), new(-125.6f, -0.3f), new(-115.2f, 6.6f), new(-106.0f, 7.8f), new(-100.2f, 13.1f),
+            new(-92.1f, 18.1f), new(-80.6f, 24.6f), new(-66.7f, 33.1f), new(-54.0f, 41.2f), new(-41.3f, 48.2f), new(-26.3f, 51.6f),
+            new(-14.8f, 56.9f), new(-2.1f, 57.9f), new(9.5f, 53.2f), new(21.0f, 48.2f), new(34.9f, 49.3f), new(44.1f, 48.6f),
+            new(48.2f, 41.2f), new(47.6f, 30.8f), new(51.0f, 20.5f), new(62.6f, 15.8f), new(76.4f, 13.5f), new(88.0f, 7.8f),
+            new(92.6f, 2.0f), new(88.0f, -4.9f), new(78.7f, -11.9f), new(68.3f, -20.0f), new(60.3f, -26.9f), new(57.9f, -36.1f),
+            new(60.7f, -46.5f), new(62.1f, -55.7f), new(55.6f, -62.7f), new(42.9f, -67.3f), new(30.2f, -71.4f),
+        };
+
+        // Route points placed by hand instead of snapped to the minimap strip, which runs off-centre
+        // there. 48: hairpin under the chocolate arch (measured from a top-down capture).
+        static readonly Dictionary<int, Vector2> RouteOverrides = new()
+        {
+            [48] = new Vector2(93.4f, 3.4f),
+        };
+
+        static readonly Color Pink = new(1f, 0.56f, 0.78f), Cream = new(1f, 0.97f, 0.98f);
 
         [MenuItem("Sugar Rush/Build Everything")]
         public static string BuildAll()
@@ -44,7 +83,10 @@ namespace SugarRush.EditorTools
             log.AppendLine(SetupKartMaterials());
             log.AppendLine(BuildKartPrefabs());
             log.AppendLine(SetupTrackImport());
-            log.AppendLine(BuildTrackScene());
+            log.AppendLine(SetupUIAssets());
+            log.AppendLine(BuildRaceScene());
+            log.AppendLine(BuildMenuScene());
+            log.AppendLine(SetupBuildSettings());
             return log.ToString();
         }
 
@@ -100,13 +142,15 @@ namespace SugarRush.EditorTools
             return $"Kart materials: {count} remapped";
         }
 
-        [MenuItem("Sugar Rush/2. Kart Prefabs")]
+        [MenuItem("Sugar Rush/2. Kart Prefabs + Roster")]
         public static string BuildKartPrefabs()
         {
             EnsureFolder(PrefabsDir);
+            EnsureFolder(DataDir);
             var physicMat = GetKartPhysicsMaterial();
             var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(KartFbx);
             var log = new System.Text.StringBuilder("Kart prefabs:");
+            var entries = new List<KartRoster.Entry>();
 
             foreach (var k in Karts)
             {
@@ -175,6 +219,9 @@ namespace SugarRush.EditorTools
                 var kart = root.AddComponent<KartController>();
                 kart.wheelAnchors = anchors.ToArray();
                 kart.wheelRadius = wheelRadius;
+                kart.maxSpeed = k.speed;
+                kart.acceleration = k.accel;
+                kart.turnRate = k.turn;
 
                 var visuals = root.AddComponent<KartVisuals>();
                 visuals.kart = kart;
@@ -182,11 +229,30 @@ namespace SugarRush.EditorTools
                 visuals.wheels = visualWheels.ToArray();
 
                 string path = $"{PrefabsDir}/Kart_{k.name}.prefab";
-                PrefabUtility.SaveAsPrefabAsset(root, path);
+                var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
                 Object.DestroyImmediate(root);
-                log.Append($" {k.name}(r={wheelRadius:0.00}, size={bb.size.x:0.0}x{bb.size.z:0.0})");
+
+                entries.Add(new KartRoster.Entry
+                {
+                    id = k.name,
+                    displayName = k.fullName,
+                    prefab = prefab,
+                    color = k.color,
+                    speed = Mathf.InverseLerp(MinSpeed, MaxSpeed, k.speed),
+                    acceleration = Mathf.InverseLerp(MinAccel, MaxAccel, k.accel),
+                    handling = Mathf.InverseLerp(MinTurn, MaxTurn, k.turn),
+                });
+                log.Append($" {k.name}(r={wheelRadius:0.00})");
             }
 
+            var roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            if (!roster)
+            {
+                roster = ScriptableObject.CreateInstance<KartRoster>();
+                AssetDatabase.CreateAsset(roster, RosterPath);
+            }
+            roster.karts = entries.ToArray();
+            EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return log.ToString();
         }
@@ -208,7 +274,7 @@ namespace SugarRush.EditorTools
             return mat;
         }
 
-        // ---------------------------------------------------------------- Track
+        // ---------------------------------------------------------------- Track import
 
         [MenuItem("Sugar Rush/3. Track Import")]
         public static string SetupTrackImport()
@@ -218,110 +284,223 @@ namespace SugarRush.EditorTools
             importer.addCollider = false;
 
             // The sky dome should not receive lighting.
-            EnsureFolder(MaterialsDir + "/Track");
-            string skyPath = MaterialsDir + "/Track/Sky.mat";
-            var sky = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
-            if (!sky)
-            {
-                sky = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                AssetDatabase.CreateAsset(sky, skyPath);
-            }
-            sky.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(TrackTextures + "/Sky_tgsd.png"));
-            sky.SetColor("_BaseColor", Color.white);
-            EditorUtility.SetDirty(sky);
+            var sky = GetMaterial("Track/Sky", "Universal Render Pipeline/Unlit", Color.white,
+                AssetDatabase.LoadAssetAtPath<Texture2D>(TrackTextures + "/Sky_tgsd.png"));
             importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), "Sky_tgsd"), sky);
 
             importer.SaveAndReimport();
             return $"Track import: scale x{TrackScale}";
         }
 
-        [MenuItem("Sugar Rush/4. Track Scene")]
-        public static string BuildTrackScene()
+        // ---------------------------------------------------------------- UI assets
+
+        [MenuItem("Sugar Rush/4. UI Assets")]
+        public static string SetupUIAssets()
+        {
+            var settings = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelSettingsPath);
+            if (!settings)
+            {
+                settings = ScriptableObject.CreateInstance<PanelSettings>();
+                AssetDatabase.CreateAsset(settings, PanelSettingsPath);
+            }
+            settings.themeStyleSheet = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(UIDir + "/SugarRushTheme.tss");
+            settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            settings.referenceResolution = new Vector2Int(1920, 1080);
+            settings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            settings.match = 0.5f;
+            settings.clearColor = false;
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+            return "UI assets: theme=" + (settings.themeStyleSheet ? settings.themeStyleSheet.name : "MISSING");
+        }
+
+        // ---------------------------------------------------------------- Race scene
+
+        [MenuItem("Sugar Rush/5. Race Scene")]
+        public static string BuildRaceScene()
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            AddLighting();
 
-            // Lighting
-            var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional;
-            sun.color = new Color(1f, 0.96f, 0.9f);
-            sun.intensity = 1.3f;
-            sun.shadows = LightShadows.Soft;
-            sun.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
-            RenderSettings.skybox = null;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.95f, 0.85f, 0.95f);
-            RenderSettings.ambientEquatorColor = new Color(0.8f, 0.75f, 0.85f);
-            RenderSettings.ambientGroundColor = new Color(0.45f, 0.4f, 0.45f);
-
-            // Track
-            var track = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(TrackFbx));
-            track.name = "Track";
-            // The bundled road mesh has holes (e.g. under the ice arch), so every visible
-            // piece of the track gets a collider too; only the sky dome and minimap are skipped.
-            MeshFilter road = null;
-            int colliders = 0;
-            foreach (var mf in track.GetComponentsInChildren<MeshFilter>())
-            {
-                if (mf.name == RoadColliderMesh) road = mf;
-                if (mf.name == MiniMapMesh) mf.GetComponent<Renderer>().enabled = false;
-                GameObjectUtility.SetStaticEditorFlags(mf.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
-                if (mf.name == MiniMapMesh || mf.name == SkyMesh) continue;
-                mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
-                colliders++;
-            }
-            if (!road) return "ERROR: road collider mesh not found";
-
-            road.GetComponent<Renderer>().enabled = false;
+            var track = InstantiateTrack(withColliders: true, out var road, out int colliders);
             Physics.SyncTransforms();
 
-            var roadData = WeldedMesh.From(road);
-            string wallInfo = BuildWalls(road.GetComponent<MeshCollider>(), roadData);
-            float killY = roadData.MinY - 30f;
+            var path = BuildTrackPath(track);
+            string wallInfo = BuildWalls(WeldedMesh.From(road), path);
+            BuildFinishLine(path);
 
-            // Player kart at a start position on the road
-            var (startPos, startRot) = FindStart(road.GetComponent<MeshCollider>(), roadData);
-            var kartPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabsDir + "/Kart_Vanellope.prefab");
-            var kartGo = (GameObject)PrefabUtility.InstantiatePrefab(kartPrefab);
-            kartGo.transform.SetPositionAndRotation(startPos + Vector3.up * 0.3f, startRot);
-            kartGo.AddComponent<PlayerKartInput>();
-            var kart = kartGo.GetComponent<KartController>();
-            kart.killY = killY;
+            var cam = AddCamera(3000f);
+            var kartCamera = cam.gameObject.AddComponent<KartCamera>();
 
-            // Camera
-            var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
-            var cam = camGo.AddComponent<Camera>();
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 3000f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(1f, 0.8f, 0.9f);
-            camGo.AddComponent<AudioListener>();
-            var follow = camGo.AddComponent<KartCamera>();
-            follow.target = kart;
-            follow.SnapToTarget();
+            var manager = new GameObject("RaceManager").AddComponent<RaceManager>();
+            manager.roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            manager.path = path;
+            manager.kartCamera = kartCamera;
 
-            var hud = new GameObject("DebugHUD").AddComponent<DebugSpeedometer>();
-            hud.kart = kart;
+            // Place the camera behind the start line so the editor view matches the first frame.
+            Vector3 start = path.Point(0), dir = path.Direction(0);
+            cam.transform.position = start - dir * 40f + Vector3.up * 6f;
+            cam.transform.LookAt(start);
 
-            EnsureFolder(Path.GetDirectoryName(ScenePath).Replace('\\', '/'));
-            EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-            return $"Scene saved: {ScenePath} | start={startPos} | colliders={colliders} | {wallInfo} | killY={killY:0}";
+            var ui = AddUIDocument("RaceUI");
+            ui.gameObject.AddComponent<RaceUI>().document = ui;
+            AddEventSystem();
+
+            EnsureFolder(Path.GetDirectoryName(RaceScenePath).Replace('\\', '/'));
+            EditorSceneManager.SaveScene(scene, RaceScenePath);
+            return $"Race scene: path={path.Count} pts / {path.Length:0} m | colliders={colliders} | {wallInfo}";
+        }
+
+        static TrackPath BuildTrackPath(GameObject track)
+        {
+            // Minimap road strip centroids: the centre of the road in XZ.
+            MeshFilter mini = null;
+            foreach (var mf in track.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.name == MiniMapMesh) mini = mf;
+            var centroids = new List<Vector2>();
+            var m = mini.transform.localToWorldMatrix;
+            var verts = mini.sharedMesh.vertices;
+            var tris = mini.sharedMesh.triangles;
+            for (int i = 0; i < tris.Length; i += 3)
+            {
+                var c = (m.MultiplyPoint3x4(verts[tris[i]]) + m.MultiplyPoint3x4(verts[tris[i + 1]]) + m.MultiplyPoint3x4(verts[tris[i + 2]])) / 3f;
+                centroids.Add(new Vector2(c.x, c.z));
+            }
+
+            var control = new List<Vector2>();
+            for (int k = 0; k < Route.Length; k++)
+            {
+                var p = Route[k];
+                if (RouteOverrides.TryGetValue(k, out var fixedPoint)) { control.Add(fixedPoint); continue; }
+                Vector2 sum = Vector2.zero; int n = 0;
+                foreach (var c in centroids) if ((c - p).sqrMagnitude < 49f) { sum += c; n++; }
+                control.Add(n > 0 ? Vector2.Lerp(p, sum / n, 0.7f) : p);
+            }
+
+            // Closed Catmull-Rom spline, densely sampled, then resampled at even spacing.
+            var dense = new List<Vector2>();
+            int count = control.Count;
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 p0 = control[(i - 1 + count) % count], p1 = control[i], p2 = control[(i + 1) % count], p3 = control[(i + 2) % count];
+                for (int s = 0; s < 16; s++)
+                {
+                    float t = s / 16f, t2 = t * t, t3 = t2 * t;
+                    dense.Add(0.5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (-p0 + 3f * p1 - 3f * p2 + p3) * t3));
+                }
+            }
+            var even = new List<Vector2> { dense[0] };
+            float carry = 0f;
+            for (int i = 0; i < dense.Count; i++)
+            {
+                Vector2 a = dense[i], b = dense[(i + 1) % dense.Count];
+                float seg = Vector2.Distance(a, b);
+                float d = PathSpacing - carry;
+                while (d <= seg)
+                {
+                    even.Add(Vector2.Lerp(a, b, d / seg));
+                    d += PathSpacing;
+                }
+                carry = seg - (d - PathSpacing);
+            }
+            if (Vector2.Distance(even[^1], even[0]) < PathSpacing * 0.5f) even.RemoveAt(even.Count - 1);
+
+            // Heights: road surface under each point, following the previous height so bridges
+            // and overhangs (ice arch) don't make the line jump.
+            var points = new Vector3[even.Count];
+            float prevY = 13f;
+            for (int i = 0; i < even.Count; i++)
+            {
+                float y = prevY;
+                float best = float.MaxValue;
+                foreach (var h in Physics.RaycastAll(new Vector3(even[i].x, 400f, even[i].y), Vector3.down, 800f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    if (h.normal.y < 0.5f || h.collider.name == "TrackWalls") continue;
+                    float dy = Mathf.Abs(h.point.y - prevY);
+                    if (dy < best && dy < 8f) { best = dy; y = h.point.y; }
+                }
+                points[i] = new Vector3(even[i].x, y, even[i].y);
+                prevY = y;
+            }
+
+            var go = new GameObject("TrackPath");
+            var path = go.AddComponent<TrackPath>();
+            path.points = points;
+            path.roadHalfWidth = RoadHalfWidth;
+            return path;
+        }
+
+        static void BuildFinishLine(TrackPath path)
+        {
+            var parent = new GameObject("FinishLine").transform;
+            Vector3 start = path.Point(0);
+            Vector3 dir = Vector3.ProjectOnPlane(path.Direction(0), Vector3.up).normalized;
+            Vector3 right = Vector3.Cross(Vector3.up, dir);
+            parent.SetPositionAndRotation(start, Quaternion.LookRotation(dir, Vector3.up));
+
+            var checker = GetGeneratedTexture("checker", 64, (x, y) => ((x / 8 + y / 8) % 2 == 0) ? Color.white : new Color(0.35f, 0.2f, 0.3f));
+            var stripes = GetGeneratedTexture("candy_stripes", 64, (x, y) => ((x + y) / 16 % 2 == 0) ? Pink : Cream);
+            var lineMat = GetMaterial("Track/FinishLine", "Universal Render Pipeline/Unlit", Color.white, checker, new Vector2(10f, 2f));
+            var bannerMat = GetMaterial("Track/FinishBanner", "Universal Render Pipeline/Lit", Color.white, checker, new Vector2(14f, 1.5f));
+            var caneMat = GetMaterial("Track/CandyCane", "Universal Render Pipeline/Lit", Color.white, stripes, new Vector2(2f, 6f));
+
+            float width = RoadHalfWidth * 2f + 1f;
+            var line = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Object.DestroyImmediate(line.GetComponent<Collider>());
+            line.name = "CheckeredLine";
+            line.transform.SetParent(parent, false);
+            line.transform.position = start + Vector3.up * 0.06f;
+            line.transform.rotation = Quaternion.LookRotation(Vector3.down, dir);
+            line.transform.localScale = new Vector3(width, 2.4f, 1f);
+            line.GetComponent<Renderer>().sharedMaterial = lineMat;
+
+            float postOffset = RoadHalfWidth + 1.2f;
+            foreach (int side in new[] { -1, 1 })
+            {
+                var post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Object.DestroyImmediate(post.GetComponent<Collider>());
+                post.name = side < 0 ? "CandyCaneLeft" : "CandyCaneRight";
+                post.transform.SetParent(parent, false);
+                post.transform.position = start + right * (postOffset * side) + Vector3.up * 3.5f;
+                post.transform.localScale = new Vector3(0.7f, 3.5f, 0.7f);
+                post.GetComponent<Renderer>().sharedMaterial = caneMat;
+            }
+
+            var banner = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.DestroyImmediate(banner.GetComponent<Collider>());
+            banner.name = "Banner";
+            banner.transform.SetParent(parent, false);
+            banner.transform.position = start + Vector3.up * 6.6f;
+            banner.transform.localScale = new Vector3(postOffset * 2f + 0.7f, 1.4f, 0.3f);
+            banner.GetComponent<Renderer>().sharedMaterial = bannerMat;
         }
 
         /// <summary>
         /// Invisible walls along open road edges that drop off (bridges, cliffs). Edges with any
-        /// track surface just beyond them (holes in the road mesh, drivable shoulders) stay open.
+        /// track surface just beyond them (holes in the road mesh, drivable shoulders) stay open,
+        /// and so do edges that cross the racing line (e.g. the little jump leaving the ring).
         /// </summary>
-        static string BuildWalls(MeshCollider roadCollider, WeldedMesh road)
+        static string BuildWalls(WeldedMesh road, TrackPath path)
         {
-            const float height = 2.5f, below = 1f, probe = 1.5f, maxDrop = 3f;
+            const float height = 2.5f, below = 1f, probe = 1.5f, maxDrop = 3f, crossingDistance = 3.5f;
             var verts = new List<Vector3>();
             var tris = new List<int>();
-            int skipped = 0;
+            int skipped = 0, crossings = 0;
 
             foreach (var (a, b, opposite) in road.BoundaryEdges())
             {
                 Vector3 edge = b - a;
+
+                int seg = path.FindClosestSegment((a + b) * 0.5f);
+                path.DistanceToSegment((a + b) * 0.5f, seg, out float t);
+                Vector3 onPath = Vector3.Lerp(path.Point(seg), path.Point(seg + 1), t);
+                Vector3 flat = (a + b) * 0.5f - onPath;
+                flat.y = 0f;
+                Vector3 edgeFlat = Vector3.ProjectOnPlane(edge, Vector3.up).normalized;
+                Vector3 pathFlat = Vector3.ProjectOnPlane(path.Direction(seg), Vector3.up).normalized;
+                bool acrossTheRoad = Mathf.Abs(Vector3.Dot(edgeFlat, pathFlat)) < 0.5f;
+                if (flat.magnitude < crossingDistance && acrossTheRoad) { crossings++; continue; }
+
                 Vector3 outward = Vector3.Cross(Vector3.up, edge).normalized;
                 Vector3 mid = (a + b) * 0.5f;
                 if (Vector3.Dot(outward, opposite - mid) > 0f) outward = -outward;
@@ -344,47 +523,193 @@ namespace SugarRush.EditorTools
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
-            string path = Root + "/Art/Track/TrackWalls.asset";
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(mesh, path);
+            string assetPath = Root + "/Art/Track/TrackWalls.asset";
+            AssetDatabase.DeleteAsset(assetPath);
+            AssetDatabase.CreateAsset(mesh, assetPath);
 
             var walls = new GameObject("TrackWalls");
             walls.AddComponent<MeshCollider>().sharedMesh = mesh;
             GameObjectUtility.SetStaticEditorFlags(walls, StaticEditorFlags.BatchingStatic);
-            return $"walls={tris.Count / 6} seamsSkipped={skipped}";
+            return $"walls={tris.Count / 6} seamsSkipped={skipped} crossingsSkipped={crossings}";
         }
 
-        /// <summary>Picks a straight-ish spot on the road and faces along it.</summary>
-        static (Vector3, Quaternion) FindStart(MeshCollider roadCollider, WeldedMesh road)
+        // ---------------------------------------------------------------- Main menu scene
+
+        [MenuItem("Sugar Rush/6. Main Menu Scene")]
+        public static string BuildMenuScene()
         {
-            // Seed: southernmost road vertex, then move to the local road centre.
-            Vector3 seed = road.Vertices[0];
-            foreach (var v in road.Vertices) if (v.z < seed.z) seed = v;
+            // Read the start line from the race scene's racing line so the turntable sits on the road.
+            EditorSceneManager.OpenScene(RaceScenePath, OpenSceneMode.Single);
+            var path = Object.FindFirstObjectByType<TrackPath>();
+            Vector3 spot = path.Point(4);
+            Vector3 dir = Vector3.ProjectOnPlane(path.Direction(4), Vector3.up).normalized;
 
-            Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
-            Vector3 centre = Vector3.zero; int n = 0;
-            foreach (var v in road.Vertices)
-                if ((Flat(v) - Flat(seed)).magnitude < 25f) { centre += v; n++; }
-            centre /= Mathf.Max(1, n);
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            AddLighting();
+            InstantiateTrack(withColliders: false, out _, out _);
 
-            // Principal horizontal direction of nearby road vertices.
-            float sxx = 0, sxz = 0, szz = 0;
-            foreach (var v in road.Vertices)
-            {
-                var d = Flat(v) - Flat(centre);
-                if (d.magnitude > 40f) continue;
-                sxx += d.x * d.x; sxz += d.x * d.z; szz += d.z * d.z;
-            }
-            float angle = 0.5f * Mathf.Atan2(2f * sxz, sxx - szz);
-            var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+            var showcaseRoot = new GameObject("KartShowcase");
+            showcaseRoot.transform.SetPositionAndRotation(spot, Quaternion.LookRotation(dir, Vector3.up));
+            var platform = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(platform.GetComponent<Collider>());
+            platform.name = "Platform";
+            platform.transform.SetParent(showcaseRoot.transform, false);
+            platform.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+            platform.transform.localScale = new Vector3(3f, 0.08f, 3f);
+            platform.GetComponent<Renderer>().sharedMaterial = GetMaterial("UI/Platform", "Universal Render Pipeline/Lit", Pink);
 
-            var ray = new Ray(new Vector3(centre.x, road.MaxY + 50f, centre.z), Vector3.down);
-            Vector3 pos = roadCollider.Raycast(ray, out var hit, 500f) ? hit.point : centre;
-            // The road arrows at this spot point the opposite way to the principal axis sign.
-            return (pos, Quaternion.LookRotation(-dir, Vector3.up));
+            var turntable = new GameObject("Turntable").transform;
+            turntable.SetParent(showcaseRoot.transform, false);
+            turntable.localPosition = new Vector3(0f, 0.16f, 0f);
+            turntable.localRotation = Quaternion.Euler(0f, 140f, 0f);
+
+            var showcase = showcaseRoot.AddComponent<KartShowcase>();
+            showcase.roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            showcase.turntable = turntable;
+
+            // Camera behind the turntable looking down the ice canyon, framed so the kart sits
+            // right of centre (the menu is on the left).
+            var cam = AddCamera(3000f);
+            Vector3 target = spot + Vector3.up * 0.7f;
+            Vector3 right = Vector3.Cross(Vector3.up, dir);
+            cam.transform.position = target - dir * 4.0f - right * 1.0f + Vector3.up * 1.0f;
+            cam.transform.LookAt(target - right * 2f);
+            cam.fieldOfView = 50f;
+
+            var ui = AddUIDocument("MainMenuUI");
+            var menu = ui.gameObject.AddComponent<MainMenuUI>();
+            menu.document = ui;
+            menu.roster = showcase.roster;
+            menu.showcase = showcase;
+            AddEventSystem();
+
+            EditorSceneManager.SaveScene(scene, MenuScenePath);
+            return "Menu scene saved: " + MenuScenePath;
         }
 
-        // ---------------------------------------------------------------- Helpers
+        [MenuItem("Sugar Rush/7. Build Settings")]
+        public static string SetupBuildSettings()
+        {
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(MenuScenePath, true),
+                new EditorBuildSettingsScene(RaceScenePath, true),
+            };
+            if (AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.DeleteAsset("Assets/Scenes");
+
+            // Both quality levels (0 = Mobile/performance, 1 = PC/quality) on every platform, so the
+            // in-game Graphics option works on desktop and web alike.
+            var qualityAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset")[0];
+            var so = new SerializedObject(qualityAsset);
+            var levels = so.FindProperty("m_QualitySettings");
+            for (int i = 0; i < levels.arraySize; i++)
+                levels.GetArrayElementAtIndex(i).FindPropertyRelative("excludedTargetPlatforms").ClearArray();
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            PlayerSettings.productName = "Sugar Rush";
+            PlayerSettings.runInBackground = true;
+            return "Build settings: MainMenu, Race | quality levels: " + string.Join(",", QualitySettings.names);
+        }
+
+        // ---------------------------------------------------------------- Scene helpers
+
+        static void AddLighting()
+        {
+            var sun = new GameObject("Sun").AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.color = new Color(1f, 0.96f, 0.9f);
+            sun.intensity = 1.3f;
+            sun.shadows = LightShadows.Soft;
+            sun.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
+            RenderSettings.skybox = null;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.95f, 0.85f, 0.95f);
+            RenderSettings.ambientEquatorColor = new Color(0.8f, 0.75f, 0.85f);
+            RenderSettings.ambientGroundColor = new Color(0.45f, 0.4f, 0.45f);
+        }
+
+        /// <summary>
+        /// Instances the track. The bundled road mesh has holes (e.g. under the ice arch), so with
+        /// colliders every visible piece gets one; only the sky dome and minimap are skipped.
+        /// </summary>
+        static GameObject InstantiateTrack(bool withColliders, out MeshFilter road, out int colliders)
+        {
+            var track = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(TrackFbx));
+            track.name = "Track";
+            road = null;
+            colliders = 0;
+            foreach (var mf in track.GetComponentsInChildren<MeshFilter>())
+            {
+                GameObjectUtility.SetStaticEditorFlags(mf.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
+                if (mf.name == RoadColliderMesh) { road = mf; mf.GetComponent<Renderer>().enabled = false; }
+                if (mf.name == MiniMapMesh) { mf.GetComponent<Renderer>().enabled = false; continue; }
+                if (mf.name == SkyMesh || !withColliders) continue;
+                mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                colliders++;
+            }
+            return track;
+        }
+
+        static Camera AddCamera(float farClip)
+        {
+            var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
+            var cam = camGo.AddComponent<Camera>();
+            cam.nearClipPlane = 0.1f;
+            cam.farClipPlane = farClip;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(1f, 0.8f, 0.9f);
+            camGo.AddComponent<AudioListener>();
+            return cam;
+        }
+
+        static UIDocument AddUIDocument(string name)
+        {
+            var doc = new GameObject(name).AddComponent<UIDocument>();
+            doc.panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelSettingsPath);
+            return doc;
+        }
+
+        static void AddEventSystem() =>
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+
+        // ---------------------------------------------------------------- Asset helpers
+
+        static Material GetMaterial(string name, string shaderName, Color color, Texture tex = null, Vector2? tiling = null)
+        {
+            string path = $"{MaterialsDir}/{name}.mat";
+            EnsureFolder(Path.GetDirectoryName(path).Replace('\\', '/'));
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (!mat)
+            {
+                mat = new Material(Shader.Find(shaderName));
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.shader = Shader.Find(shaderName);
+            mat.SetColor("_BaseColor", color);
+            mat.SetTexture("_BaseMap", tex);
+            mat.SetTextureScale("_BaseMap", tiling ?? Vector2.one);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.5f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        static Texture2D GetGeneratedTexture(string name, int size, System.Func<int, int, Color> pixel)
+        {
+            EnsureFolder(GeneratedDir);
+            string path = $"{GeneratedDir}/{name}.png";
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    tex.SetPixel(x, y, pixel(x, y));
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(path);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
 
         static void EnsureFolder(string path)
         {
@@ -399,7 +724,6 @@ namespace SugarRush.EditorTools
         {
             public readonly List<Vector3> Vertices = new();
             public readonly List<int> Triangles = new();
-            public float MinY = float.MaxValue, MaxY = float.MinValue;
 
             public static WeldedMesh From(MeshFilter mf)
             {
@@ -417,8 +741,6 @@ namespace SugarRush.EditorTools
                         idx = w.Vertices.Count;
                         w.Vertices.Add(p);
                         map[key] = idx;
-                        w.MinY = Mathf.Min(w.MinY, p.y);
-                        w.MaxY = Mathf.Max(w.MaxY, p.y);
                     }
                     remap[i] = idx;
                 }

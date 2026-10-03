@@ -14,9 +14,11 @@ Juego de carreras de karts inspirado en el circuito de Sugar Rush (Wreck-It Ralp
 
 ## Estructura
 Todo el contenido propio va en `Assets/_SugarRush/`:
-- `Art/Karts`, `Art/Track` — modelos importados (FBX de Sketchfab)
-- `Materials`, `Prefabs`, `Scenes`, `Audio`, `UI`
-- `Scripts/Kart` (controlador arcade, drift, turbo), `Scripts/Race` (vueltas, checkpoints, posiciones), `Scripts/Camera`, `Scripts/AI` (rivales), `Scripts/UI` (HUD, menús)
+- `Art/Karts`, `Art/Track` — modelos importados (FBX de Sketchfab); `Art/Generated` — texturas generadas (cuadros de meta, bastón de caramelo)
+- `Data/KartRoster.asset` — lista de corredores (prefab, nombre, stats 0..1 para el menú)
+- `Materials`, `Prefabs`, `Scenes`, `Audio`
+- `Scripts/Core` (GameSettings, Loc, KartRoster), `Scripts/Kart`, `Scripts/Race`, `Scripts/AI`, `Scripts/Camera`, `Scripts/Editor`
+- `UI/` — USS, tema, fuente y los scripts de UI (MainMenuUI, RaceUI, KartShowcase, UIKit)
 
 ## Assets (CC Attribution — dar crédito, ver CREDITS.md)
 - Karts: "Sugar rush karts | Storybook" por RazyBerry — https://sketchfab.com/3d-models/sugar-rush-karts-storybook-05cffff8f28b4d18965b5b7e0e3b05f3 (~9.6k caras).
@@ -28,21 +30,30 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - Los ZIP originales están en `~/Downloads` (no se suben al repo).
 
 ## Cómo está armado (estado actual)
-- Escena principal: `Assets/_SugarRush/Scenes/SugarRush_Track.unity` (única en Build Settings).
-- Todo se genera con `Assets/_SugarRush/Scripts/Editor/SugarRushSetup.cs` (menú **Sugar Rush/**): materiales de karts → prefabs → import de pista → escena. Si cambias el builder, vuelve a correr el paso; no edites a mano lo que genera.
-  - Mapeo FBX → personaje: `Base` = Vanellope, `.001` = Taffyta, `.002` = Adorabeezle, `.003` = Rancis, `.004` = Candlehead (sacado de los nombres de Geometry dentro del FBX).
-  - Pista importada a escala ×40 (`TrackScale`): carretera ~10 m de ancho, kart ~2 m. +Z es el frente de los karts.
-  - Paredes invisibles (`TrackWalls.asset`) solo en bordes de la carretera con caída > 3 m.
-  - El sentido de carrera en la salida va hacia donde apuntan las flechas del piso (por eso `FindStart` invierte la dirección).
-- Prefabs: `Prefabs/Kart_<Nombre>.prefab` — raíz en layer "Ignore Raycast" (la suspensión usa raycasts y no debe pegarle al propio kart), Rigidbody + BoxCollider sin fricción + `KartController` + `KartVisuals`.
-- Scripts de juego (namespace `SugarRush`): `KartController` (física arcade, drift con 2 niveles de turbo, respawn a un punto seguro de ~3 s atrás), `PlayerKartInput` (WASD/flechas, Espacio/Shift drift, R reaparecer, gamepad), `KartVisuals`, `KartCamera`, `DebugSpeedometer` (HUD temporal), `KartTestPilot` (secuencia de inputs para pruebas automáticas).
-- Pendiente: vueltas/checkpoints, línea de meta, HUD real, rivales con IA (se puede sacar la ruta de `mini_map_road`), selección de personaje, música, iluminación baked.
+- Escenas (Build Settings): `Scenes/MainMenu.unity` (0) y `Scenes/SugarRush_Track.unity` (1). Nombres en `SceneNames`.
+- Todo se genera con `Scripts/Editor/SugarRushSetup.cs` (menú **Sugar Rush/**, o `BuildAll()`): materiales → prefabs + roster → import de pista → assets de UI → escena de carrera → menú → build settings. Si cambias el builder, vuelve a correr el paso; no edites a mano lo que genera. `BuildMenuScene` lee la ruta desde la escena de carrera, así que va después.
+  - Mapeo FBX → personaje: `Base` = Vanellope, `.001` = Taffyta, `.002` = Adorabeezle, `.003` = Rancis, `.004` = Candlehead (sacado de los nombres de Geometry dentro del FBX). Stats por kart en la tabla `Karts` del builder.
+  - Pista importada a escala ×40 (`TrackScale`): carretera ~8–10 m de ancho, kart ~2 m. +Z es el frente de los karts.
+  - Ruta de carrera (`TrackPath`, 164 puntos cada 4 m, ~668 m por vuelta, índice 0 = línea de meta): trazada a mano sobre una vista cenital (`Route` en el builder), ajustada al centro de `mini_map_road` (esa malla viene rota, no sirve sola) y con alturas por raycast. `RouteOverrides` fija puntos donde la malla del minimapa está corrida (48 = curva cerrada bajo el arco de chocolate).
+  - Paredes invisibles (`TrackWalls.asset`) solo en bordes con caída > 3 m, y nunca en bordes que cruzan la ruta (hay un saltito a la salida del anillo).
+  - El circuito: recta de salida → eses que suben → anillo elevado (~44 m) → rampa → meseta de ajedrez → salto de 6 m a un puente angosto → curva cerrada bajo el arco → bajada a la meta.
+- Carrera: `RaceManager` crea los 5 karts en la parrilla (el jugador sale último), cuenta 3-2-1, ordena posiciones por `RaceProgress.RaceDistance`, detecta la meta y guarda récord por número de vueltas (PlayerPrefs `best_<vueltas>`).
+- `RaceProgress` (por kart): vueltas, sentido contrario, fuera de pista (lejos o caído) y atascado (acelera sin avanzar). "Volver a la pista" = `ReturnToTrack()` al punto de la ruta actual; automático a los 6 s (fuera), 1,5 s (caído), 8 s jugador / 4 s IA (atascado). `ReturnLog` registra dónde pasa (diagnóstico).
+- `AIKartDriver`: sigue la ruta con look-ahead, carriles solo en tramos rectos, frena antes de curvas (`CornerSpeed`), esquiva obstáculos con "bigotes" (raycasts). Zona que aún cuesta: salida de la meseta/puente (seg ~89–100).
+- UI con UI Toolkit, construida por código (`UIKit`), estilos en `UI/SugarRush.uss` vía el tema `SugarRushTheme.tss` (sin el tema por defecto de Unity, por eso el USS estira `.unity-ui-document__root`). Fuente Lilita One (no tiene ★ ◀ ▶; usar ‹ ›). Textos en `Loc` (español/inglés), idioma en Opciones.
+- `GameSettings` (PlayerPrefs): idioma, volumen, gráficos (nivel de calidad 0 = Mobile/rendimiento, 1 = PC/calidad; ambos activos en todas las plataformas), vueltas, kart elegido.
+- Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
+- Pendiente: exportar a WebGL + controles táctiles para celular, música/sonidos, iluminación baked, pulir IA en la meseta.
 
 ## Cómo maneja Claude el Editor
 - `unity` está en `~/AppData/Local/Unity/bin` (agregarlo al PATH en Bash). Usar `unity command eval_file` con scripts en `AgentScripts/` (fuera de Assets, ignorado por git); el código es el cuerpo de un método, sin `using` (nombres totalmente calificados).
 - Llamar `unity command set_autotick` una vez por sesión: si no, el Editor sin foco no procesa comandos.
 - `capture_game_view --save_path` siempre guarda dentro de `Assets/`; borrar la imagen después.
 - Probar manejo: entrar en Play, agregar `KartTestPilot` al kart vía eval, `wait_for` su `Finished`, leer `Log`. Nunca agregarlo fuera de Play (ensucia la escena).
+- Probar una carrera completa: desde Play, `GameSettings.Laps = N` + `SceneManager.LoadScene(SceneNames.Race)` (sin `Save()`), esperar `RaceManager.CurrentState == Racing`, desactivar `PlayerKartInput` del jugador y agregarle `AIKartDriver`, `Time.timeScale = 2`. Al terminar, borrar el récord falso (`PlayerPrefs.DeleteKey("best_N")`).
+- Cada comando tarda varios segundos en llegar: no sirve para maniobras cronometradas (usar `KartTestPilot`) ni para capturar momentos breves.
+- Con `GetMethod(...).Invoke` se pueden llamar métodos privados de la UI (p. ej. `MainMenuUI.ShowPage`, `RaceUI.SetPaused`) para capturar cada pantalla.
+- `UQueryExtensions.Query<T>(root)` en vez de `root.Query<T>()` dentro de eval (no hay `using`).
 
 ## Repositorio
 - GitHub (público): https://github.com/sofia-londono/sugar-rush — rama `main`.
