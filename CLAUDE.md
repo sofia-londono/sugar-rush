@@ -1,6 +1,6 @@
 # Sugar Rush RD
 
-Juego de carreras de karts inspirado en el circuito de Sugar Rush (Wreck-It Ralph / Ralph el demoledor). Proyecto personal de fan: no se publica ni se vende (IP de Disney).
+Juego de carreras de karts inspirado en el circuito de Sugar Rush (Wreck-It Ralph / Ralph el demoledor). Proyecto personal de fan sin fines de lucro: el código está en un repo público, pero el juego no se vende ni se distribuye como producto (IP de Disney).
 
 ## Stack
 - Unity 6000.3.25f1 LTS, URP (Universal 3D), Input System nuevo.
