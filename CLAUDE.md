@@ -19,8 +19,17 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - `Scripts/Kart` (controlador arcade, drift, turbo), `Scripts/Race` (vueltas, checkpoints, posiciones), `Scripts/Camera`, `Scripts/AI` (rivales), `Scripts/UI` (HUD, menús)
 
 ## Assets (CC Attribution — dar crédito, ver CREDITS.md)
-- Karts: "Sugar rush karts | Storybook" por RazyBerry — https://sketchfab.com/3d-models/sugar-rush-karts-storybook-05cffff8f28b4d18965b5b7e0e3b05f3 (~9.6k caras; Candy Kart, Pink Lightning, Ice Rocket, Kit Kart, Ice Screamer; algunas piezas pueden venir mal ubicadas y las ruedas hay que separarlas).
+- Karts: "Sugar rush karts | Storybook" por RazyBerry — https://sketchfab.com/3d-models/sugar-rush-karts-storybook-05cffff8f28b4d18965b5b7e0e3b05f3 (~9.6k caras).
+  - Archivo: `Assets/_SugarRush/Art/Karts/SRstorybookracers.fbx` (los 5 karts en un solo FBX) + `Textures/`.
+  - Corredores según texturas: Vanellope, Taffyta, Rancis, Candlehead, Adorabeezle (body, spoiler y wheel por cada uno; texturas `diffusespec` + algunas `normal`).
+  - Algunas piezas pueden venir mal ubicadas; las ruedas deben quedar como objetos separados para girar.
 - Pista: "Map_tgsd" por amogusstrikesback2 — https://sketchfab.com/3d-models/map-tgsd-6cf96205665d48b681aab3b129aa9a79 (~108k caras).
+  - Archivo: `Assets/_SugarRush/Art/Track/map_tgsd.fbx` + `Textures/` (texturas `road_tgsd_*` para la carretera, `tgsd_*` para el entorno, `Sky_tgsd` para el cielo).
+- Los ZIP originales están en `~/Downloads` (no se suben al repo).
+
+## Repositorio
+- GitHub (público): https://github.com/sofia-londono/sugar-rush — rama `main`.
+- Hacer commit después de cada avance funcional.
 
 ## Convenciones
 - Código C# en inglés; textos del juego y comunicación con la usuaria en español.
