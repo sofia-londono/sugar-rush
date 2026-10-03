@@ -47,6 +47,7 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 ## Repositorio
 - GitHub (público): https://github.com/sofia-londono/sugar-rush — rama `main`.
 - Hacer commit después de cada avance funcional.
+- No agregar Co-Authored-By ni firmas de Claude en commits ni PRs.
 
 ## Convenciones
 - Código C# en inglés; textos del juego y comunicación con la usuaria en español.
