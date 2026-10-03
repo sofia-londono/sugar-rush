@@ -5,7 +5,8 @@ using UnityEngine.UIElements;
 namespace SugarRush
 {
     /// <summary>
-    /// Main menu: Play, Choose racer, Options, Quit. Built in code on a UIDocument.
+    /// Main menu: Play, Choose racer, Options, Quit. Built in code on a UIDocument with the
+    /// candy elements; pages swap with an animated transition.
     /// </summary>
     public class MainMenuUI : MonoBehaviour
     {
@@ -18,21 +19,26 @@ namespace SugarRush
         VisualElement root;
         Page page;
         int previewKart;
+        bool leaving;
 
         // Character page widgets that change when cycling karts
-        Label charName;
+        CandyTitle charName;
         VisualElement speedFill, accelFill, handlingFill;
 
         // Start (not OnEnable) so the KartShowcase has spawned its karts in Awake first.
         void Start()
         {
             root = document.rootVisualElement;
+            root.Clear();
+            root.Add(new SprinkleRain(40));
             previewKart = GameSettings.SelectedKart;
             ShowPage(Page.Main);
+            UIKit.FadeIn(root);
         }
 
         void Update()
         {
+            if (leaving) return;
             if (page != Page.Main && UIKit.BackPressed())
             {
                 if (page == Page.Characters) previewKart = GameSettings.SelectedKart;
@@ -50,28 +56,25 @@ namespace SugarRush
         void ShowPage(Page next)
         {
             page = next;
-            root.Clear();
-            switch (page)
+            var screen = page switch
             {
-                case Page.Main: BuildMain(); break;
-                case Page.Characters: BuildCharacters(); break;
-                case Page.Options: BuildOptions(); break;
-            }
+                Page.Characters => BuildCharacters(),
+                Page.Options => BuildOptions(),
+                _ => BuildMain(),
+            };
+            UIKit.ShowScreen(root, screen);
             showcase.Show(page == Page.Characters ? previewKart : GameSettings.SelectedKart);
         }
 
         // ------------------------------------------------------------ Main
 
-        void BuildMain()
+        VisualElement BuildMain()
         {
             var screen = UIKit.Div("screen", "screen--left");
             var column = UIKit.Div("menu-column");
             screen.Add(column);
 
-            var titleRow = UIKit.Div("row");
-            titleRow.Add(UIKit.Label("SUGAR", "title", "title--gap"));
-            titleRow.Add(UIKit.Label("RUSH", "title", "title__accent"));
-            column.Add(titleRow);
+            column.Add(UIKit.Title("Sugar Rush", CandyTone.Rainbow, "candy-title--xl"));
             column.Add(UIKit.Label(Loc.T("menu.subtitle"), "subtitle"));
 
             var play = UIKit.Button(Loc.T("menu.play"), Play);
@@ -87,14 +90,16 @@ namespace SugarRush
                 column.Add(UIKit.Label(Loc.T("menu.best", GameSettings.Laps, Loc.Time(best)), "small-text"));
 
             screen.Add(UIKit.Label(Loc.T("menu.credits"), "small-text", "footer"));
-            root.Add(screen);
             UIKit.FocusLater(play);
+            return screen;
         }
 
         void Play()
         {
+            if (leaving) return;
+            leaving = true;
             GameSettings.Save();
-            SceneManager.LoadScene(SceneNames.Race);
+            UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
         }
 
         void Quit()
@@ -107,21 +112,22 @@ namespace SugarRush
 
         // ------------------------------------------------------------ Characters
 
-        void BuildCharacters()
+        VisualElement BuildCharacters()
         {
             var screen = UIKit.Div("screen", "screen--left");
             var column = UIKit.Div("menu-column");
             screen.Add(column);
-            column.Add(UIKit.Label(Loc.T("char.title"), "title", "title--small"));
+            column.Add(UIKit.Title(Loc.T("char.title"), CandyTone.Rainbow, "candy-title--lg"));
 
             var nameRow = UIKit.Div("row", "char-name-row");
             nameRow.Add(UIKit.ArrowButton("‹", () => CycleKart(-1)));
-            charName = UIKit.Label("", "char-name");
+            charName = UIKit.Title("", CandyTone.Pink, "candy-title--md");
+            charName.AddToClassList("char-name");
             nameRow.Add(charName);
             nameRow.Add(UIKit.ArrowButton("›", () => CycleKart(1)));
             column.Add(nameRow);
 
-            var stats = UIKit.Div("panel");
+            var stats = new FrostingPanel(CandyTone.Mint, 7);
             stats.Add(StatRow("char.speed", "", out speedFill));
             stats.Add(StatRow("char.accel", "stat-bar__fill--mint", out accelFill));
             stats.Add(StatRow("char.handling", "stat-bar__fill--lavender", out handlingFill));
@@ -134,9 +140,9 @@ namespace SugarRush
             stats.Add(buttons);
             column.Add(stats);
 
-            root.Add(screen);
             RefreshCharacter();
             UIKit.FocusLater(pick);
+            return screen;
         }
 
         VisualElement StatRow(string key, string fillClass, out VisualElement fill)
@@ -146,6 +152,9 @@ namespace SugarRush
             var bar = UIKit.Div("stat-bar");
             fill = UIKit.Div("stat-bar__fill");
             if (!string.IsNullOrEmpty(fillClass)) fill.AddToClassList(fillClass);
+            var stripes = new CandyStripes { stripeWidth = 10f };
+            stripes.AddToClassList("stat-bar__stripes");
+            fill.Add(stripes);
             bar.Add(fill);
             row.Add(bar);
             return row;
@@ -157,12 +166,13 @@ namespace SugarRush
             previewKart = ((previewKart + dir) % n + n) % n;
             showcase.Show(previewKart);
             RefreshCharacter();
+            UIKit.Pop(charName);
         }
 
         void RefreshCharacter()
         {
             var entry = roster.Get(previewKart);
-            charName.text = entry.displayName;
+            charName.Text = entry.displayName;
             // Stat values are data, so they are the one place the UI sets sizes from code.
             speedFill.style.width = Length.Percent(Mathf.Lerp(15f, 100f, entry.speed));
             accelFill.style.width = Length.Percent(Mathf.Lerp(15f, 100f, entry.acceleration));
@@ -178,11 +188,14 @@ namespace SugarRush
 
         // ------------------------------------------------------------ Options
 
-        void BuildOptions()
+        VisualElement BuildOptions()
         {
             var screen = UIKit.Div("screen");
-            var panel = UIKit.Div("panel", "panel--wide");
-            panel.Add(UIKit.Label(Loc.T("opt.title"), "panel-title"));
+            var panel = new FrostingPanel(CandyTone.Lavender, 11);
+            panel.AddToClassList("frosting-panel--wide");
+            var heading = UIKit.Title(Loc.T("opt.title"), CandyTone.Pink, "candy-title--md");
+            heading.AddToClassList("panel-heading");
+            panel.Add(heading);
 
             panel.Add(OptionRow("opt.language", () => Loc.T("opt.language.value"), dir =>
             {
@@ -212,8 +225,8 @@ namespace SugarRush
             var back = UIKit.Button(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small");
             panel.Add(back);
             screen.Add(panel);
-            root.Add(screen);
             UIKit.FocusLater(back);
+            return screen;
         }
 
         /// <summary>"Label   ‹ value ›" row. The row itself is focusable so left/right changes it.</summary>
@@ -224,7 +237,7 @@ namespace SugarRush
 
             var controls = UIKit.Div("row");
             var valueLabel = UIKit.Label(value(), "option-row__value");
-            void Change(int dir) { change(dir); valueLabel.text = value(); }
+            void Change(int dir) { change(dir); valueLabel.text = value(); UIKit.Pop(valueLabel); }
             controls.Add(UIKit.ArrowButton("‹", () => Change(-1), small: true));
             controls.Add(valueLabel);
             controls.Add(UIKit.ArrowButton("›", () => Change(1), small: true));

@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 32d3b2dc6a1f9cb418b226dd5fc62fab
+guid: 9ac9fadfbb8507d4fb61ebc7c909fa85
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Lilita One
+  - Fredoka
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

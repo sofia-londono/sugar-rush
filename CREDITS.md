@@ -8,6 +8,8 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
 - **Map_tgsd** — amogusstrikesback2
   https://sketchfab.com/3d-models/map-tgsd-6cf96205665d48b681aab3b129aa9a79
 
-## Tipografía (SIL Open Font License 1.1)
-- **Lilita One** — Juan Montoreano
-  https://fonts.google.com/specimen/Lilita+One (licencia en `Assets/_SugarRush/UI/Fonts/OFL.txt`)
+## Tipografías
+- **Luckiest Guy** — Astigmatic (licencia Apache 2.0) — títulos
+  https://fonts.google.com/specimen/Luckiest+Guy (licencia en `Assets/_SugarRush/UI/Fonts/LuckiestGuy-LICENSE.txt`)
+- **Fredoka** — The Fredoka Project Authors (SIL Open Font License 1.1) — botones y textos; instancias fijas SemiBold/Bold generadas de la fuente variable
+  https://fonts.google.com/specimen/Fredoka (licencia en `Assets/_SugarRush/UI/Fonts/Fredoka-OFL.txt`)

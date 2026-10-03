@@ -5,20 +5,21 @@ namespace SugarRush
 {
     /// <summary>
     /// In-race UI: HUD (position, lap, time, speed), countdown and messages, the
-    /// "back to track" prompt, the pause menu and the results screen.
+    /// "back to track" prompt, the pause menu and the results screen — all in the candy style.
     /// </summary>
     public class RaceUI : MonoBehaviour
     {
         public UIDocument document;
 
         RaceManager race;
-        VisualElement root, hud, overlay;
-        Label position, positionTotal, lap, time, speed, boost, countdown, message, lost, pauseHint;
+        VisualElement root, hud, overlay, lost;
+        CandyTitle position, positionTotal, speed, boost, countdown, message;
+        Label lap, time, lostText, pauseHint;
         VisualElement resultsRows;
         float messageUntil;
         float resultsRefresh;
-        bool resultsShown;
-        bool finalLapAnnounced;
+        bool resultsShown, leaving, finalLapAnnounced;
+        int lastCountdown = -1;
 
         void Start()
         {
@@ -28,6 +29,7 @@ namespace SugarRush
             BuildHud();
             race.StateChanged += OnStateChanged;
             race.RacerLapCompleted += OnLapCompleted;
+            UIKit.FadeIn(root);
         }
 
         void OnDestroy()
@@ -42,30 +44,29 @@ namespace SugarRush
         void BuildHud()
         {
             hud = UIKit.Div("hud");
-            hud.pickingMode = PickingMode.Ignore;
 
             var topLeft = UIKit.Div("hud-corner", "hud-corner--top-left");
-            var posRow = UIKit.Div("row");
-            position = UIKit.Label("", "hud-position");
-            positionTotal = UIKit.Label("", "hud-position__total");
+            var posRow = UIKit.Div("hud-row");
+            position = UIKit.Title("", CandyTone.Pink, "candy-title--xl");
+            positionTotal = UIKit.Title("", CandyTone.Lavender, "candy-title--sm");
+            positionTotal.AddToClassList("hud-total");
             posRow.Add(position);
             posRow.Add(positionTotal);
             topLeft.Add(posRow);
             hud.Add(topLeft);
 
             var topRight = UIKit.Div("hud-corner", "hud-corner--top-right");
-            lap = UIKit.Label("", "hud-chip", "hud-chip--lap");
-            time = UIKit.Label("", "hud-chip");
-            topRight.Add(lap);
-            topRight.Add(time);
+            lap = UIKit.Chip(topRight, "", "candy-chip--lap");
+            time = UIKit.Chip(topRight, "", "candy-chip--time");
             hud.Add(topRight);
 
             var bottomRight = UIKit.Div("hud-corner", "hud-corner--bottom-right");
-            boost = UIKit.Label("TURBO!", "hud-boost");
-            var speedRow = UIKit.Div("row");
-            speed = UIKit.Label("0", "hud-speed");
+            boost = UIKit.Title("¡TURBO!", CandyTone.Lemon, "candy-title--sm");
+            var speedRow = UIKit.Div("hud-row");
+            speed = UIKit.Title("0", CandyTone.Sky, "candy-title--lg");
+            speed.AddToClassList("hud-speed");
             speedRow.Add(speed);
-            speedRow.Add(UIKit.Label("km/h", "hud-speed__unit"));
+            speedRow.Add(UIKit.Label("km/h", "hud-unit"));
             bottomRight.Add(boost);
             bottomRight.Add(speedRow);
             hud.Add(bottomRight);
@@ -76,9 +77,13 @@ namespace SugarRush
             hud.Add(bottomLeft);
 
             var center = UIKit.Div("hud-center");
-            countdown = UIKit.Label("", "hud-countdown");
-            message = UIKit.Label("", "hud-message");
-            lost = UIKit.Label("", "hud-lost");
+            countdown = UIKit.Title("", CandyTone.Rainbow, "candy-title--xxl");
+            message = UIKit.Title("", CandyTone.Rainbow, "candy-title--lg");
+            lost = new FrostingPanel(CandyTone.Mint, 23);
+            lost.AddToClassList("frosting-panel--compact");
+            lost.AddToClassList("hud-lost");
+            lostText = UIKit.Label("", "hud-lost__text");
+            lost.Add(lostText);
             center.Add(countdown);
             center.Add(message);
             center.Add(lost);
@@ -92,7 +97,7 @@ namespace SugarRush
         {
             if (!race || !race.Player) return;
 
-            if (UIKit.PausePressed() && !resultsShown)
+            if (UIKit.PausePressed() && !resultsShown && !leaving)
                 SetPaused(!race.IsPaused);
 
             RefreshHud();
@@ -107,39 +112,45 @@ namespace SugarRush
         void RefreshHud()
         {
             var player = race.Player;
-            position.text = Loc.Ordinal(player.Position);
-            positionTotal.text = "/" + race.Racers.Count;
+            position.Text = Loc.Ordinal(player.Position);
+            positionTotal.Text = "/" + race.Racers.Count;
             lap.text = Loc.T("hud.lap", Mathf.Clamp(player.CompletedLaps + 1, 1, race.Laps), race.Laps);
             time.text = Loc.Time(player.Finished ? player.FinishTime : race.RaceTime);
-            speed.text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
+            speed.Text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
             boost.EnableInClassList("hidden", !player.Kart.IsBoosting);
 
             bool counting = race.CurrentState == RaceManager.State.Countdown;
             countdown.EnableInClassList("hidden", !counting);
-            if (counting) countdown.text = race.Countdown.ToString();
+            if (counting && race.Countdown != lastCountdown)
+            {
+                lastCountdown = race.Countdown;
+                countdown.Text = race.Countdown.ToString();
+                UIKit.Pop(countdown);
+            }
 
             // Priority: wrong way warning, then timed messages.
             bool wrongWay = player.WrongWay && !player.Finished;
             if (wrongWay)
             {
-                message.text = Loc.T("hud.wrongWay");
-                message.AddToClassList("hud-message--warning");
+                message.Text = Loc.T("hud.wrongWay");
+                message.Tone = CandyTone.Lemon;
             }
-            else message.RemoveFromClassList("hud-message--warning");
             message.EnableInClassList("hidden", !wrongWay && Time.unscaledTime > messageUntil);
 
             bool showLost = player.NeedsHelp && !player.Finished && !race.IsPaused;
             lost.EnableInClassList("hidden", !showLost);
             if (showLost)
-                lost.text = Loc.T("hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
+                lostText.text = Loc.T("hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
 
             pauseHint.EnableInClassList("hidden", resultsShown);
         }
 
         void ShowMessage(string text, float seconds = 1.6f)
         {
-            message.text = text;
+            message.Tone = CandyTone.Rainbow;
+            message.Text = text;
             messageUntil = Time.unscaledTime + seconds;
+            UIKit.Pop(message);
         }
 
         void OnStateChanged(RaceManager.State state)
@@ -154,7 +165,7 @@ namespace SugarRush
             if (racer.CompletedLaps == race.Laps - 1 && !finalLapAnnounced)
             {
                 finalLapAnnounced = true;
-                ShowMessage(Loc.T("hud.finalLap") + "\n" + Loc.T("hud.lapTime", racer.CompletedLaps, Loc.Time(racer.LastLap)), 2.2f);
+                ShowMessage(Loc.T("hud.finalLap"), 2.2f);
             }
             else ShowMessage(Loc.T("hud.lapTime", racer.CompletedLaps, Loc.Time(racer.LastLap)), 2f);
         }
@@ -172,22 +183,32 @@ namespace SugarRush
         {
             CloseOverlay();
             overlay = UIKit.Div("screen", "screen--dim");
-            var panel = UIKit.Div("panel");
-            panel.Add(UIKit.Label(Loc.T("pause.title"), "panel-title"));
+            var panel = new FrostingPanel(CandyTone.Pink, 31);
+            var heading = UIKit.Title(Loc.T("pause.title"), CandyTone.Pink, "candy-title--lg");
+            heading.AddToClassList("panel-heading");
+            panel.Add(heading);
             var resume = UIKit.Button(Loc.T("pause.resume"), () => SetPaused(false));
             panel.Add(resume);
-            panel.Add(UIKit.Button(Loc.T("pause.restart"), race.Restart, "candy-button--mint"));
+            panel.Add(UIKit.Button(Loc.T("pause.restart"), () => LeaveTo(race.Restart), "candy-button--mint"));
             panel.Add(UIKit.Button(Loc.T("pause.checkpoint"), () => { CloseOverlay(); race.PlayerBackToTrack(); }, "candy-button--lavender"));
-            panel.Add(UIKit.Button(Loc.T("pause.mainMenu"), race.QuitToMenu, "candy-button--lemon"));
+            panel.Add(UIKit.Button(Loc.T("pause.mainMenu"), () => LeaveTo(race.QuitToMenu), "candy-button--lemon"));
             overlay.Add(panel);
-            root.Add(overlay);
+            UIKit.Enter(root, overlay);
             UIKit.FocusLater(resume);
         }
 
         void CloseOverlay()
         {
-            overlay?.RemoveFromHierarchy();
+            UIKit.Leave(overlay);
             overlay = null;
+        }
+
+        /// <summary>Fades to the pastel curtain before restarting or leaving the race.</summary>
+        void LeaveTo(System.Action action)
+        {
+            if (leaving) return;
+            leaving = true;
+            UIKit.FadeOut(root, action);
         }
 
         // ------------------------------------------------------------ Results
@@ -199,9 +220,11 @@ namespace SugarRush
             var player = race.Player;
 
             overlay = UIKit.Div("screen", "screen--dim");
-            var panel = UIKit.Div("panel", "panel--wide");
-            panel.Add(UIKit.Label(Loc.T("results.title"), "panel-title"));
-            panel.Add(UIKit.Label(Loc.Ordinal(player.Position), "hud-position"));
+            overlay.Add(new SprinkleRain(60));
+            var panel = new FrostingPanel(CandyTone.Pink, 47);
+            panel.AddToClassList("frosting-panel--wide");
+            panel.Add(UIKit.Title(Loc.T("results.title"), CandyTone.Pink, "candy-title--md"));
+            panel.Add(UIKit.Title(Loc.Ordinal(player.Position), CandyTone.Lavender, "candy-title--lg"));
             if (race.NewRecord) panel.Add(UIKit.Label(Loc.T("results.newRecord"), "results-highlight"));
 
             resultsRows = UIKit.Div();
@@ -209,13 +232,13 @@ namespace SugarRush
             panel.Add(UIKit.Label(Loc.T("results.bestLap", Loc.Time(player.BestLap)), "results-highlight"));
 
             var buttons = UIKit.Div("row");
-            var again = UIKit.Button(Loc.T("results.retry"), race.Restart, "candy-button--small");
+            var again = UIKit.Button(Loc.T("results.retry"), () => LeaveTo(race.Restart), "candy-button--small");
             buttons.Add(again);
-            buttons.Add(UIKit.Button(Loc.T("pause.mainMenu"), race.QuitToMenu, "candy-button--lemon", "candy-button--small"));
+            buttons.Add(UIKit.Button(Loc.T("pause.mainMenu"), () => LeaveTo(race.QuitToMenu), "candy-button--lemon", "candy-button--small"));
             panel.Add(buttons);
 
             overlay.Add(panel);
-            root.Add(overlay);
+            UIKit.Enter(root, overlay);
             RefreshResults();
             UIKit.FocusLater(again);
         }
