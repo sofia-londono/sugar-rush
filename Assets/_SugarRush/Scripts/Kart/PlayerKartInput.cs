@@ -10,8 +10,17 @@ namespace SugarRush
     [RequireComponent(typeof(KartController))]
     public class PlayerKartInput : MonoBehaviour
     {
+        [Header("Steering feel")]
+        [Tooltip("How fast keyboard steering builds up to full lock (per second).")]
+        public float steerRise = 4f;
+        [Tooltip("How fast steering returns to centre when the key is released (per second).")]
+        public float steerFall = 8f;
+        [Tooltip("Gamepad stick response: 1 = linear, 2 = gentle near the centre.")]
+        public float stickCurve = 1.8f;
+
         KartController kart;
         RaceProgress progress;
+        float smoothedSteer;
 
         void Awake()
         {
@@ -34,7 +43,7 @@ namespace SugarRush
                 return;
             }
 
-            float throttle = 0f, steer = 0f;
+            float throttle = 0f, steer = 0f, stick = 0f;
             bool drift = false, backToTrack = false;
 
             var kb = Keyboard.current;
@@ -53,13 +62,22 @@ namespace SugarRush
             {
                 throttle += pad.rightTrigger.ReadValue() - pad.leftTrigger.ReadValue();
                 if (pad.buttonSouth.isPressed) throttle += 1f;
-                steer += pad.leftStick.x.ReadValue();
+                float x = pad.leftStick.x.ReadValue();
+                stick = Mathf.Sign(x) * Mathf.Pow(Mathf.Abs(x), stickCurve);
                 drift |= pad.rightShoulder.isPressed || pad.buttonWest.isPressed;
                 backToTrack |= pad.buttonNorth.wasPressedThisFrame;
             }
 
+            // Keys are all-or-nothing, so ease them in: a tap gives a small correction, holding
+            // gives full lock. Releasing (or reversing) returns faster than it builds up.
+            bool releasing = Mathf.Abs(steer) < 0.01f;
+            bool reversing = Mathf.Abs(smoothedSteer) > 0.01f && Mathf.Sign(steer) != Mathf.Sign(smoothedSteer);
+            float rate = releasing || reversing ? steerFall : steerRise;
+            smoothedSteer = Mathf.MoveTowards(smoothedSteer, Mathf.Clamp(steer, -1f, 1f), rate * Time.deltaTime);
+            float finalSteer = Mathf.Abs(stick) > Mathf.Abs(smoothedSteer) ? stick : smoothedSteer;
+
             kart.Throttle = Mathf.Clamp(throttle, -1f, 1f);
-            kart.Steer = Mathf.Clamp(steer, -1f, 1f);
+            kart.Steer = Mathf.Clamp(finalSteer, -1f, 1f);
             kart.DriftHeld = drift;
             if (backToTrack) kart.Respawn();
         }

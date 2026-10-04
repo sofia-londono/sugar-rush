@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd528ce44a9a74f41a80dadc5a99b2ba, type: 3}
+  m_Name: AIDifficulty
+  m_EditorClassIdentifier: Assembly-CSharp::SugarRush.AIDifficulty
+  easy:
+    speedScale: 0.86
+    cornerScale: 0.92
+    mistakeScale: 1.6
+    aggressionScale: 0.5
+    catchUpBoost: 0.03
+    leadSlowdown: 0.08
+    rubberBandDistance: 120
+  normal:
+    speedScale: 0.94
+    cornerScale: 0.98
+    mistakeScale: 1
+    aggressionScale: 1
+    catchUpBoost: 0.06
+    leadSlowdown: 0.05
+    rubberBandDistance: 120
+  hard:
+    speedScale: 1
+    cornerScale: 1.05
+    mistakeScale: 0.5
+    aggressionScale: 1.2
+    catchUpBoost: 0.09
+    leadSlowdown: 0.02
+    rubberBandDistance: 120

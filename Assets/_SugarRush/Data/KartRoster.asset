@@ -20,6 +20,7 @@ MonoBehaviour:
     speed: 0.5555556
     acceleration: 0.7
     handling: 0.75
+    personality: {fileID: 11400000, guid: eae573f33b226954fb97008eb338d896, type: 2}
   - id: Taffyta
     displayName: Taffyta Muttonfudge
     prefab: {fileID: 3527243718002122580, guid: 0d04d8c548f144d4a9b392f6aabf6aae, type: 3}
@@ -27,6 +28,7 @@ MonoBehaviour:
     speed: 0.8888889
     acceleration: 0.2
     handling: 0.21875
+    personality: {fileID: 11400000, guid: 8dce394b00d359d4182d93e2ab01fa2b, type: 2}
   - id: Adorabeezle
     displayName: Adorabeezle Winterpop
     prefab: {fileID: 1048769069955946598, guid: 1c7970039abc8644688134c9d737f8f2, type: 3}
@@ -34,6 +36,7 @@ MonoBehaviour:
     speed: 0.33333334
     acceleration: 0.9
     handling: 0.9375
+    personality: {fileID: 11400000, guid: 0e4c18eefa3e04b4dbe6543b11cfdd31, type: 2}
   - id: Rancis
     displayName: Rancis Fluggerbutter
     prefab: {fileID: 3815348446234820329, guid: 68e4e9ad015d5864c9fbeaf25905f922, type: 3}
@@ -41,6 +44,7 @@ MonoBehaviour:
     speed: 0.7777778
     acceleration: 0.4
     handling: 0.375
+    personality: {fileID: 11400000, guid: 14963f0a77b50c4469b44cd4153824f3, type: 2}
   - id: Candlehead
     displayName: Candlehead
     prefab: {fileID: 7925114480421620970, guid: a4edab2196df154458a4d375e79d5756, type: 3}
@@ -48,3 +52,4 @@ MonoBehaviour:
     speed: 0.44444445
     acceleration: 0.8
     handling: 0.625
+    personality: {fileID: 11400000, guid: 0d2c266780b5c004fac73906b7106bfa, type: 2}

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e4bad49ac469334880dad39ad336e04, type: 3}
+  m_Name: SoundLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::SugarRush.SoundLibrary
+  menuMusic: {fileID: 8300000, guid: 47fe73894f525c941a851c06552b0159, type: 3}
+  raceMusic: {fileID: 8300000, guid: dd89b4ed8210e0649a6934485bd70ffe, type: 3}
+  engineLoop: {fileID: 8300000, guid: 4b97863d56ae62846ba27026e85d0efc, type: 3}
+  driftLoop: {fileID: 8300000, guid: 0cce3257146b654499647b8a2ba648c3, type: 3}
+  boost: {fileID: 8300000, guid: 2c346a6152b2fe64facb902255198a18, type: 3}
+  crashes:
+  - {fileID: 8300000, guid: d7d45e83c9c06de40961c815f0bd3c89, type: 3}
+  - {fileID: 8300000, guid: 062b8540809103f4cac5528a1cdbcbe9, type: 3}
+  - {fileID: 8300000, guid: b83cbfc09c3f1fb46afe045220c62dc5, type: 3}
+  countdownBeep: {fileID: 8300000, guid: b1511b9c99aaf6d4bba1271a604f7417, type: 3}
+  countdownGo: {fileID: 8300000, guid: 02ed63c64169b1f4dbe787b1ff825a8d, type: 3}
+  lapChime: {fileID: 8300000, guid: 9cb1c3c81b27f7247a08050a9146a2a3, type: 3}
+  finishFanfare: {fileID: 8300000, guid: 3d002c87f286c18439510908e5f31546, type: 3}
+  uiMove: {fileID: 8300000, guid: bbfb882e5de5d2149a286029f4d2f10a, type: 3}
+  uiClick: {fileID: 8300000, guid: 0157b912b0ec5634ca3f6515cb908421, type: 3}
+  uiBack: {fileID: 8300000, guid: 98d2f92fd16eaf945a60532cdb18f681, type: 3}
+  uiConfirm: {fileID: 8300000, guid: 0f362408ad93813438ef3f646485f1ca, type: 3}

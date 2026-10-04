@@ -157,12 +157,28 @@ namespace SugarRush
                 ReturnToTrack();
         }
 
+        bool IsSpotFree(Vector3 spot)
+        {
+            var manager = RaceManager.Instance;
+            if (!manager) return true;
+            foreach (var other in manager.Racers)
+                if (other != this && (other.transform.position - spot).sqrMagnitude < 2.5f * 2.5f) return false;
+            return true;
+        }
+
         /// <summary>Puts the kart back on the racing line at its current checkpoint, facing forward.</summary>
         public void ReturnToTrack()
         {
             int seg = Segment;
             Vector3 point = path.Point(seg);
             Vector3 dir = path.Direction(seg);
+
+            // Don't drop two karts on the same spot: shift sideways if someone is already there.
+            Vector3 side = Vector3.Cross(Vector3.up, dir).normalized;
+            foreach (float offset in new[] { 0f, -2.5f, 2.5f })
+            {
+                if (IsSpotFree(point + side * offset)) { point += side * offset; break; }
+            }
 
             Vector3 position = point;
             var hits = Physics.RaycastAll(point + Vector3.up * 3f, Vector3.down, 12f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);

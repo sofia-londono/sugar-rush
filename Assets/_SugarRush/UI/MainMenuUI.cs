@@ -34,6 +34,7 @@ namespace SugarRush
             previewKart = GameSettings.SelectedKart;
             ShowPage(Page.Main);
             UIKit.FadeIn(root);
+            if (SoundLibrary.Instance) AudioHub.PlayMusic(SoundLibrary.Instance.menuMusic);
         }
 
         void Update()
@@ -41,6 +42,7 @@ namespace SugarRush
             if (leaving) return;
             if (page != Page.Main && UIKit.BackPressed())
             {
+                AudioHub.UIBack();
                 if (page == Page.Characters) previewKart = GameSettings.SelectedKart;
                 ShowPage(Page.Main);
                 return;
@@ -49,7 +51,7 @@ namespace SugarRush
             if (page == Page.Characters)
             {
                 int dir = UIKit.HorizontalPressed();
-                if (dir != 0) CycleKart(dir);
+                if (dir != 0) { AudioHub.UIMove(); CycleKart(dir); }
             }
         }
 
@@ -98,6 +100,7 @@ namespace SugarRush
         {
             if (leaving) return;
             leaving = true;
+            AudioHub.UIConfirm();
             GameSettings.Save();
             UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
         }
@@ -133,7 +136,7 @@ namespace SugarRush
             stats.Add(StatRow("char.handling", "stat-bar__fill--lavender", out handlingFill));
 
             var buttons = UIKit.Div("row");
-            buttons.Add(UIKit.Button(Loc.T("menu.back"), () => { previewKart = GameSettings.SelectedKart; ShowPage(Page.Main); },
+            buttons.Add(UIKit.BackButton(Loc.T("menu.back"), () => { previewKart = GameSettings.SelectedKart; ShowPage(Page.Main); },
                 "candy-button--lemon", "candy-button--small"));
             var pick = UIKit.Button(Loc.T("menu.select"), PickKart, "candy-button--small");
             buttons.Add(pick);
@@ -204,9 +207,21 @@ namespace SugarRush
                 ShowPage(Page.Options); // rebuild every label in the new language
             }));
 
-            panel.Add(OptionRow("opt.volume", () => Mathf.RoundToInt(GameSettings.Volume * 100f) + "%", dir =>
+            panel.Add(OptionRow("opt.difficulty", () => Loc.T("opt.difficulty." + (int)GameSettings.Difficulty), dir =>
             {
-                GameSettings.Volume = Mathf.Clamp01(Mathf.Round(GameSettings.Volume * 10f + dir) / 10f);
+                GameSettings.Difficulty = (Difficulty)Mathf.Clamp((int)GameSettings.Difficulty + dir, 0, 2);
+                GameSettings.Save();
+            }));
+
+            panel.Add(OptionRow("opt.music", () => Mathf.RoundToInt(GameSettings.MusicVolume * 100f) + "%", dir =>
+            {
+                GameSettings.MusicVolume = Mathf.Clamp01(Mathf.Round(GameSettings.MusicVolume * 10f + dir) / 10f);
+                GameSettings.Save();
+            }));
+
+            panel.Add(OptionRow("opt.sfx", () => Mathf.RoundToInt(GameSettings.SfxVolume * 100f) + "%", dir =>
+            {
+                GameSettings.SfxVolume = Mathf.Clamp01(Mathf.Round(GameSettings.SfxVolume * 10f + dir) / 10f);
                 GameSettings.Save();
             }));
 
@@ -222,7 +237,7 @@ namespace SugarRush
                 GameSettings.Save();
             }));
 
-            var back = UIKit.Button(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small");
+            var back = UIKit.BackButton(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small");
             panel.Add(back);
             screen.Add(panel);
             UIKit.FocusLater(back);
@@ -237,7 +252,7 @@ namespace SugarRush
 
             var controls = UIKit.Div("row");
             var valueLabel = UIKit.Label(value(), "option-row__value");
-            void Change(int dir) { change(dir); valueLabel.text = value(); UIKit.Pop(valueLabel); }
+            void Change(int dir) { change(dir); valueLabel.text = value(); UIKit.Pop(valueLabel); AudioHub.UIMove(); }
             controls.Add(UIKit.ArrowButton("‹", () => Change(-1), small: true));
             controls.Add(valueLabel);
             controls.Add(UIKit.ArrowButton("›", () => Change(1), small: true));

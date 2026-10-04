@@ -13,7 +13,9 @@ namespace SugarRush
         public const int MinLaps = 1, MaxLaps = 5;
 
         public static Language Language { get; set; } = Language.Spanish;
-        public static float Volume { get; set; } = 0.8f;
+        public static float MusicVolume { get; set; } = 0.7f;
+        public static float SfxVolume { get; set; } = 0.8f;
+        public static Difficulty Difficulty { get; set; } = SugarRush.Difficulty.Normal;
         /// <summary>Index into QualitySettings.names (0 = Mobile/performance, 1 = PC/quality).</summary>
         public static int Quality { get; set; } = 1;
         public static int Laps { get; set; } = 3;
@@ -28,7 +30,10 @@ namespace SugarRush
         {
             var defaultLanguage = Application.systemLanguage == SystemLanguage.Spanish ? Language.Spanish : Language.English;
             Language = (Language)PlayerPrefs.GetInt("lang", (int)defaultLanguage);
-            Volume = PlayerPrefs.GetFloat("volume", 0.8f);
+            float legacyVolume = PlayerPrefs.GetFloat("volume", 0.8f); // single volume slider of older versions
+            MusicVolume = PlayerPrefs.GetFloat("musicVolume", legacyVolume * 0.85f);
+            SfxVolume = PlayerPrefs.GetFloat("sfxVolume", legacyVolume);
+            Difficulty = (SugarRush.Difficulty)Mathf.Clamp(PlayerPrefs.GetInt("difficulty", (int)SugarRush.Difficulty.Normal), 0, 2);
             Quality = PlayerPrefs.GetInt("quality", Application.isMobilePlatform ? 0 : QualitySettings.names.Length - 1);
             Laps = Mathf.Clamp(PlayerPrefs.GetInt("laps", 3), MinLaps, MaxLaps);
             SelectedKart = PlayerPrefs.GetInt("kart", 0);
@@ -38,7 +43,9 @@ namespace SugarRush
         public static void Save()
         {
             PlayerPrefs.SetInt("lang", (int)Language);
-            PlayerPrefs.SetFloat("volume", Volume);
+            PlayerPrefs.SetFloat("musicVolume", MusicVolume);
+            PlayerPrefs.SetFloat("sfxVolume", SfxVolume);
+            PlayerPrefs.SetInt("difficulty", (int)Difficulty);
             PlayerPrefs.SetInt("quality", Quality);
             PlayerPrefs.SetInt("laps", Laps);
             PlayerPrefs.SetInt("kart", SelectedKart);
@@ -49,7 +56,7 @@ namespace SugarRush
 
         static void Apply()
         {
-            AudioListener.volume = Volume;
+            AudioListener.volume = 1f; // music and effects are scaled separately by AudioHub / KartAudio
             int level = Mathf.Clamp(Quality, 0, QualitySettings.names.Length - 1);
             if (QualitySettings.GetQualityLevel() != level) QualitySettings.SetQualityLevel(level, true);
         }

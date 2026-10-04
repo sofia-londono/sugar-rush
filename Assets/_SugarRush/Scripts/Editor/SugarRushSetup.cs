@@ -26,6 +26,10 @@ namespace SugarRush.EditorTools
         const string DataDir = Root + "/Data";
         const string UIDir = Root + "/UI";
         const string RosterPath = DataDir + "/KartRoster.asset";
+        const string AIDir = DataDir + "/AI";
+        const string DifficultyPath = AIDir + "/AIDifficulty.asset";
+        const string AudioDir = Root + "/Audio";
+        const string SoundLibraryPath = Root + "/Resources/SoundLibrary.asset";
         const string PanelSettingsPath = UIDir + "/PanelSettings.asset";
         const string RaceScenePath = Root + "/Scenes/" + SceneNames.Race + ".unity";
         const string MenuScenePath = Root + "/Scenes/" + SceneNames.MainMenu + ".unity";
@@ -82,6 +86,8 @@ namespace SugarRush.EditorTools
             var log = new System.Text.StringBuilder();
             log.AppendLine(SetupKartMaterials());
             log.AppendLine(BuildKartPrefabs());
+            log.AppendLine(SetupAI());
+            log.AppendLine(SetupAudio());
             log.AppendLine(SetupTrackImport());
             log.AppendLine(SetupUIAssets());
             log.AppendLine(BuildRaceScene());
@@ -252,6 +258,7 @@ namespace SugarRush.EditorTools
                 AssetDatabase.CreateAsset(roster, RosterPath);
             }
             roster.karts = entries.ToArray();
+            AssignPersonalities(roster);
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return log.ToString();
@@ -272,6 +279,154 @@ namespace SugarRush.EditorTools
             };
             AssetDatabase.CreateAsset(mat, path);
             return mat;
+        }
+
+        // ---------------------------------------------------------------- AI
+
+        // Starting values for each character's driving style. Assets are only created when
+        // missing, so tweaks made in the Inspector are never overwritten by the builder.
+        static readonly (string name, float straight, float corner, float braking, float lane, float consistency,
+            float aggression, float attack, float block, float mistakes, Vector2 mistakeTime)[] Personalities =
+        {
+            // Balanced all-rounder (drives when the player picks someone else).
+            ("Vanellope",   1.02f, 1.03f, 1.00f, 1.5f, 0.60f, 0.25f,  9f, 12f, 0.5f, new Vector2(0.4f, 0.8f)),
+            // Aggressive: rams karts alongside and blocks karts behind.
+            ("Taffyta",     1.00f, 0.98f, 1.10f, 2.0f, 0.50f, 0.90f, 10f, 14f, 0.5f, new Vector2(0.4f, 0.8f)),
+            // Rocket on straights, brakes late and is slow through corners.
+            ("Rancis",      1.08f, 0.80f, 1.35f, 1.2f, 0.50f, 0.20f,  9f, 12f, 1.0f, new Vector2(0.4f, 0.8f)),
+            // Clumsy: frequent wobbles, missed braking points and hesitations.
+            ("Candlehead",  0.98f, 0.95f, 1.00f, 2.0f, 0.15f, 0.10f,  9f, 12f, 7.0f, new Vector2(0.5f, 1.2f)),
+            // Steady and safe: brakes early, holds a tight line, never makes mistakes.
+            ("Adorabeezle", 0.99f, 1.00f, 0.85f, 0.6f, 1.00f, 0.00f,  9f, 12f, 0.0f, new Vector2(0.4f, 0.8f)),
+        };
+
+        [MenuItem("Sugar Rush/AI Personalities + Difficulty")]
+        public static string SetupAI()
+        {
+            EnsureFolder(AIDir);
+            int created = 0;
+            foreach (var p in Personalities)
+            {
+                string path = $"{AIDir}/AI_{p.name}.asset";
+                if (AssetDatabase.LoadAssetAtPath<AIPersonality>(path)) continue;
+                var asset = ScriptableObject.CreateInstance<AIPersonality>();
+                asset.straightSpeed = p.straight;
+                asset.cornerSpeed = p.corner;
+                asset.lateBraking = p.braking;
+                asset.laneWidth = p.lane;
+                asset.consistency = p.consistency;
+                asset.aggression = p.aggression;
+                asset.attackRange = p.attack;
+                asset.blockRange = p.block;
+                asset.mistakesPerMinute = p.mistakes;
+                asset.mistakeDuration = p.mistakeTime;
+                AssetDatabase.CreateAsset(asset, path);
+                created++;
+            }
+            if (!AssetDatabase.LoadAssetAtPath<AIDifficulty>(DifficultyPath))
+            {
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<AIDifficulty>(), DifficultyPath);
+                created++;
+            }
+
+            var roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            if (roster)
+            {
+                AssignPersonalities(roster);
+                EditorUtility.SetDirty(roster);
+            }
+            AssetDatabase.SaveAssets();
+            return $"AI: {created} assets created";
+        }
+
+        static void AssignPersonalities(KartRoster roster)
+        {
+            foreach (var entry in roster.karts)
+                entry.personality = AssetDatabase.LoadAssetAtPath<AIPersonality>($"{AIDir}/AI_{entry.id}.asset");
+        }
+
+        // ---------------------------------------------------------------- Audio
+
+        /// <summary>
+        /// Import settings tuned for a light game: music streamed from compressed OGG, short
+        /// effects mono at 22 kHz decompressed once into memory, a hard cap on voices, and a
+        /// bigger DSP buffer (lower audio CPU on a laptop).
+        /// </summary>
+        [MenuItem("Sugar Rush/Audio")]
+        public static string SetupAudio()
+        {
+            var log = new System.Text.StringBuilder("Audio:");
+            foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { AudioDir }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var importer = (AudioImporter)AssetImporter.GetAtPath(path);
+                bool isMusic = path.Contains("/Music/");
+                var settings = importer.defaultSampleSettings;
+                settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                if (isMusic)
+                {
+                    settings.loadType = AudioClipLoadType.Streaming;
+                    settings.quality = 0.45f;
+                    settings.sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate;
+                    importer.forceToMono = false;
+                    importer.loadInBackground = true;
+                }
+                else
+                {
+                    settings.loadType = AudioClipLoadType.DecompressOnLoad;
+                    settings.quality = 0.6f;
+                    settings.sampleRateSetting = AudioSampleRateSetting.OverrideSampleRate;
+                    settings.sampleRateOverride = 22050;
+                    importer.forceToMono = true;
+                    importer.loadInBackground = false;
+                }
+                settings.preloadAudioData = !isMusic;
+                importer.defaultSampleSettings = settings;
+                importer.SaveAndReimport();
+            }
+
+            EnsureFolder(Path.GetDirectoryName(SoundLibraryPath).Replace('\\', '/'));
+            var lib = AssetDatabase.LoadAssetAtPath<SoundLibrary>(SoundLibraryPath);
+            if (!lib)
+            {
+                lib = ScriptableObject.CreateInstance<SoundLibrary>();
+                AssetDatabase.CreateAsset(lib, SoundLibraryPath);
+            }
+            AudioClip Clip(string file) => AssetDatabase.LoadAssetAtPath<AudioClip>($"{AudioDir}/{file}");
+            lib.menuMusic = Clip("Music/menu_music.ogg");
+            lib.raceMusic = Clip("Music/race_music.ogg");
+            lib.engineLoop = Clip("SFX/engine_loop.wav");
+            lib.driftLoop = Clip("SFX/drift_loop.wav");
+            lib.boost = Clip("SFX/boost.wav");
+            lib.crashes = new[]
+            {
+                Clip("SFX/crash_impactSoft_heavy_000.ogg"),
+                Clip("SFX/crash_impactSoft_heavy_002.ogg"),
+                Clip("SFX/crash_impactPunch_medium_001.ogg"),
+            };
+            lib.countdownBeep = Clip("SFX/countdown_beep.wav");
+            lib.countdownGo = Clip("SFX/countdown_go.wav");
+            lib.lapChime = Clip("SFX/lap_chime.wav");
+            lib.finishFanfare = Clip("SFX/finish_fanfare.wav");
+            lib.uiMove = Clip("SFX/ui_move.ogg");
+            lib.uiClick = Clip("SFX/ui_click.ogg");
+            lib.uiBack = Clip("SFX/ui_back.ogg");
+            lib.uiConfirm = Clip("SFX/ui_confirm.ogg");
+            EditorUtility.SetDirty(lib);
+            AssetDatabase.SaveAssets();
+
+            // Project audio: at most 24 real voices, and the "best performance" DSP buffer.
+            var audioManager = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/AudioManager.asset")[0];
+            var so = new SerializedObject(audioManager);
+            so.FindProperty("m_RealVoiceCount").intValue = 24;
+            so.FindProperty("m_VirtualVoiceCount").intValue = 48;
+            so.FindProperty("m_DSPBufferSize").intValue = 1024;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            int missing = 0;
+            foreach (var f in typeof(SoundLibrary).GetFields())
+                if (f.FieldType == typeof(AudioClip) && !(AudioClip)f.GetValue(lib)) missing++;
+            return log.Append($" library ok, missing clips={missing}, voices=24").ToString();
         }
 
         // ---------------------------------------------------------------- Track import
@@ -334,6 +489,7 @@ namespace SugarRush.EditorTools
 
             var manager = new GameObject("RaceManager").AddComponent<RaceManager>();
             manager.roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            manager.aiDifficulty = AssetDatabase.LoadAssetAtPath<AIDifficulty>(DifficultyPath);
             manager.path = path;
             manager.kartCamera = kartCamera;
 

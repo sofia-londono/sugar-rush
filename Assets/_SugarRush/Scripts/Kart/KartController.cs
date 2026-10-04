@@ -27,6 +27,8 @@ namespace SugarRush
         [Header("Handling")]
         public float turnRate = 120f;
         public float grip = 12f;
+        [Tooltip("Fraction of the turn rate left at top speed (1 = no reduction).")]
+        [Range(0.3f, 1f)] public float highSpeedSteering = 0.6f;
 
         [Header("Drift & Boost")]
         public float driftGrip = 1.8f;
@@ -40,6 +42,8 @@ namespace SugarRush
         [Header("Air")]
         public float extraGravity = 1.5f;
         public float airLevelingTorque = 6f;
+        [Tooltip("Fraction of the normal turn rate available while airborne.")]
+        [Range(0f, 1f)] public float airControl = 0.45f;
 
         [Header("Respawn")]
         public float killY = -50f;
@@ -145,7 +149,9 @@ namespace SugarRush
                     steer = DriftDirection * Mathf.Lerp(0.35f, 1f, (Steer * DriftDirection + 1f) * 0.5f);
                     rate *= driftTurnMultiplier;
                 }
-                float speedFactor = Mathf.Clamp01(Mathf.Abs(ForwardSpeed) / 6f);
+                // Full turn rate at low speed, gentler at top speed so straights stay stable.
+                float speed01 = Mathf.Clamp01(Mathf.Abs(ForwardSpeed) / Mathf.Max(1f, maxSpeed));
+                float speedFactor = Mathf.Clamp01(Mathf.Abs(ForwardSpeed) / 6f) * Mathf.Lerp(1f, highSpeedSteering, speed01);
                 float direction = ForwardSpeed >= -0.1f ? 1f : -1f;
                 float targetYaw = steer * rate * Mathf.Deg2Rad * speedFactor * direction;
 
@@ -156,6 +162,12 @@ namespace SugarRush
             }
             else
             {
+                // A little steering in the air so jumps can be lined up for the landing.
+                Vector3 av = rb.angularVelocity;
+                float targetYaw = Steer * turnRate * airControl * Mathf.Deg2Rad;
+                av += Vector3.up * (targetYaw - Vector3.Dot(av, Vector3.up)) * Mathf.Clamp01(dt * 6f);
+                rb.angularVelocity = av;
+
                 rb.AddForce(Physics.gravity * extraGravity, ForceMode.Acceleration);
                 // Keep the kart upright while airborne
                 Vector3 axis = Vector3.Cross(transform.up, Vector3.up);

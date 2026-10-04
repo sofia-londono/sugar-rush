@@ -30,7 +30,10 @@ namespace SugarRush
             race.StateChanged += OnStateChanged;
             race.RacerLapCompleted += OnLapCompleted;
             UIKit.FadeIn(root);
+            if (Lib) AudioHub.PlayMusic(Lib.raceMusic);
         }
+
+        static SoundLibrary Lib => SoundLibrary.Instance;
 
         void OnDestroy()
         {
@@ -98,7 +101,10 @@ namespace SugarRush
             if (!race || !race.Player) return;
 
             if (UIKit.PausePressed() && !resultsShown && !leaving)
+            {
+                if (race.IsPaused) AudioHub.UIBack(); else AudioHub.UIConfirm();
                 SetPaused(!race.IsPaused);
+            }
 
             RefreshHud();
 
@@ -126,6 +132,7 @@ namespace SugarRush
                 lastCountdown = race.Countdown;
                 countdown.Text = race.Countdown.ToString();
                 UIKit.Pop(countdown);
+                if (Lib) AudioHub.PlayUI(Lib.countdownBeep, 0.8f);
             }
 
             // Priority: wrong way warning, then timed messages.
@@ -155,13 +162,22 @@ namespace SugarRush
 
         void OnStateChanged(RaceManager.State state)
         {
-            if (state == RaceManager.State.Racing) ShowMessage(Loc.T("hud.go"), 1.2f);
-            if (state == RaceManager.State.Finished) Invoke(nameof(ShowResults), 1.5f);
+            if (state == RaceManager.State.Racing)
+            {
+                ShowMessage(Loc.T("hud.go"), 1.2f);
+                if (Lib) AudioHub.PlayUI(Lib.countdownGo, 0.9f);
+            }
+            if (state == RaceManager.State.Finished)
+            {
+                if (Lib) AudioHub.PlayUI(Lib.finishFanfare, 0.9f);
+                Invoke(nameof(ShowResults), 1.5f);
+            }
         }
 
         void OnLapCompleted(RaceProgress racer)
         {
             if (!racer.isPlayer || racer.Finished) return;
+            if (Lib) AudioHub.PlayUI(Lib.lapChime, 0.8f, racer.CompletedLaps == race.Laps - 1 ? 1.2f : 1f);
             if (racer.CompletedLaps == race.Laps - 1 && !finalLapAnnounced)
             {
                 finalLapAnnounced = true;

@@ -25,7 +25,7 @@ namespace SugarRush
         public float slotSideOffset = 2.6f;
 
         [Header("AI")]
-        public Vector2 aiSkillRange = new(0.9f, 0.97f);
+        public AIDifficulty aiDifficulty;
 
         public State CurrentState { get; private set; } = State.Countdown;
         public int Countdown { get; private set; } = 3;
@@ -40,6 +40,8 @@ namespace SugarRush
         public event System.Action<RaceProgress> RacerLapCompleted;
 
         int finishedCount;
+
+        AIDifficulty.Level DifficultyLevel => aiDifficulty ? aiDifficulty.Get(GameSettings.Difficulty) : new AIDifficulty.Level();
 
         public bool CanDrive(RaceProgress racer) =>
             CurrentState != State.Countdown && !(racer && racer.isPlayer && racer.Finished);
@@ -104,9 +106,11 @@ namespace SugarRush
                 else
                 {
                     var ai = go.AddComponent<AIKartDriver>();
-                    ai.skill = Random.Range(aiSkillRange.x, aiSkillRange.y);
+                    ai.personality = entry.personality;
+                    ai.difficulty = DifficultyLevel;
                     ai.laneOffset = (slot % 2 == 0 ? -1f : 1f) * Random.Range(0.5f, 2.2f);
                 }
+                go.AddComponent<KartAudio>().isPlayer = progress.isPlayer;
             }
 
             if (kartCamera)
@@ -174,7 +178,7 @@ namespace SugarRush
                 // Let the computer drive the player's kart for the victory lap.
                 racer.GetComponent<PlayerKartInput>().enabled = false;
                 var ai = racer.gameObject.AddComponent<AIKartDriver>();
-                ai.skill = 0.8f;
+                ai.difficulty = new AIDifficulty.Level { speedScale = 0.8f, catchUpBoost = 0f, leadSlowdown = 0f };
                 SetState(State.Finished);
             }
         }
@@ -189,7 +193,8 @@ namespace SugarRush
         {
             IsPaused = paused;
             Time.timeScale = paused ? 0f : 1f;
-            AudioListener.pause = paused;
+            AudioListener.pause = paused; // pauses engines; music and menu sounds ignore it
+            AudioHub.Instance.Duck(paused);
         }
 
         public void PlayerBackToTrack()

@@ -11,6 +11,10 @@ namespace SugarRush
     public static class UIKit
     {
         const long EnterDelayMs = 30, LeaveMs = 220, FadeMs = 380;
+        const string BackTag = "back";
+
+        /// <summary>True while the UI moves focus by itself, so it doesn't play the "move" sound.</summary>
+        static bool silentFocus;
 
         public static VisualElement Div(params string[] classes)
         {
@@ -35,6 +39,7 @@ namespace SugarRush
         public static Button Button(string text, Action onClick, params string[] classes)
         {
             var b = new Button(onClick) { text = "" };
+            b.clicked += () => { if (Equals(b.userData, BackTag)) AudioHub.UIBack(); else AudioHub.UIClick(); };
             b.ClearClassList();
             b.AddToClassList("candy-button");
             foreach (var c in classes) b.AddToClassList(c);
@@ -51,10 +56,18 @@ namespace SugarRush
 
             bool hovered = false, focused = false;
             void Lit() => stripes.Animate = hovered || focused;
-            b.RegisterCallback<PointerEnterEvent>(_ => { hovered = true; Lit(); });
+            b.RegisterCallback<PointerEnterEvent>(_ => { hovered = true; Lit(); AudioHub.UIMove(); });
             b.RegisterCallback<PointerLeaveEvent>(_ => { hovered = false; Lit(); });
-            b.RegisterCallback<FocusInEvent>(_ => { focused = true; Lit(); });
+            b.RegisterCallback<FocusInEvent>(_ => { focused = true; Lit(); if (!silentFocus && !hovered) AudioHub.UIMove(); });
             b.RegisterCallback<FocusOutEvent>(_ => { focused = false; Lit(); });
+            return b;
+        }
+
+        /// <summary>Candy button that plays the "back" sound instead of the click.</summary>
+        public static Button BackButton(string text, Action onClick, params string[] classes)
+        {
+            var b = Button(text, onClick, classes);
+            b.userData = BackTag;
             return b;
         }
 
@@ -64,6 +77,7 @@ namespace SugarRush
         public static Button ArrowButton(string text, Action onClick, bool small = false)
         {
             var b = new Button(onClick) { text = "", focusable = false };
+            b.clicked += AudioHub.UIMove;
             b.ClearClassList();
             b.AddToClassList("peppermint-button");
             if (small) b.AddToClassList("peppermint-button--small");
@@ -146,7 +160,8 @@ namespace SugarRush
 
         public static void FocusLater(Focusable element)
         {
-            if (element is VisualElement ve) ve.schedule.Execute(() => element.Focus()).ExecuteLater(EnterDelayMs + 20);
+            if (element is VisualElement ve)
+                ve.schedule.Execute(() => { silentFocus = true; element.Focus(); silentFocus = false; }).ExecuteLater(EnterDelayMs + 20);
         }
 
         // ------------------------------------------------------------ Input shortcuts

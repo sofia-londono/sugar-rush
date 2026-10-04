@@ -18,6 +18,8 @@ namespace SugarRush
             [Range(0, 1)] public float speed;
             [Range(0, 1)] public float acceleration;
             [Range(0, 1)] public float handling;
+            [Tooltip("How this character drives when the computer controls it.")]
+            public AIPersonality personality;
         }
 
         public Entry[] karts;

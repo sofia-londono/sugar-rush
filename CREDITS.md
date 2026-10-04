@@ -13,3 +13,17 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
   https://fonts.google.com/specimen/Luckiest+Guy (licencia en `Assets/_SugarRush/UI/Fonts/LuckiestGuy-LICENSE.txt`)
 - **Fredoka** — The Fredoka Project Authors (SIL Open Font License 1.1) — botones y textos; instancias fijas SemiBold/Bold generadas de la fuente variable
   https://fonts.google.com/specimen/Fredoka (licencia en `Assets/_SugarRush/UI/Fonts/Fredoka-OFL.txt`)
+
+## Música (CC0 / dominio público)
+- **Chiptune Adventures** — Juhani Junkala (SubspaceAudio), CC0
+  https://opengameart.org/content/4-chiptunes-adventure
+  - Menú: "Stage Select" → `Assets/_SugarRush/Audio/Music/menu_music.ogg`
+  - Carrera: "Stage 2" → `Assets/_SugarRush/Audio/Music/race_music.ogg`
+
+## Efectos de sonido
+- **Impact Sounds** — Kenney (www.kenney.nl), CC0 — choques
+  https://kenney.nl/assets/impact-sounds
+- **Interface Sounds** — Kenney (www.kenney.nl), CC0 — sonidos de menú (clic, mover, atrás, confirmar)
+  https://kenney.nl/assets/interface-sounds
+- Motor, derrape, turbo, cuenta regresiva, campana de vuelta y fanfarria de meta: sintetizados para este
+  proyecto con `Tools/synth_sfx.py` (código propio, CC0).
