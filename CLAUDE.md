@@ -55,7 +55,19 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
   - Textos en `Loc` (español/inglés), idioma en Opciones.
 - `GameSettings` (PlayerPrefs): idioma, volumen de música y de efectos, dificultad, gráficos (nivel de calidad 0 = Mobile/rendimiento, 1 = PC/calidad; ambos activos en todas las plataformas), vueltas, kart elegido.
 - Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
-- Pendiente: exportar a WebGL + controles táctiles para celular, iluminación baked.
+- Pendiente: multijugador fase 2 (sala con selección de personaje y hasta 5 jugadores) y fase 3 (WebGL + controles táctiles con aceleración automática), iluminación baked.
+
+## Multijugador en línea
+- Paquetes: Netcode for GameObjects 2.13.3, Multiplayer Services 2.3.3 (API de "sessions" = Lobby + Relay), Multiplayer Play Mode 2.0.2. Proyecto UGS vinculado: `cd38f69e-af4e-4ba7-85b2-941ae4f89294` (en el dashboard se llama "My project"); Relay y Lobby activos.
+- Modelo anfitrión-cliente: quien crea la sala es host. Cada jugador simula SU kart (física local, respuesta inmediata) y lo envía ~20 veces/s (`NetKart.State`, NetworkVariable con escritura del dueño, ~46 bytes). Los demás karts son "proxies" kinemáticos (`KartController.SetProxy`) que interpolan 0,12 s en el pasado y extrapolan hasta 0,25 s. La IA vive en el host (dueño = servidor).
+- Choques entre karts de distintas máquinas: el collider del proxy es trigger; el kart que yo simulo recibe un empujón (`NetKart.OnTriggerStay`). Entre karts simulados en la misma máquina, física normal.
+- Carrera: el host spawnea la parrilla cuando todos cargaron la escena (`OnLoadEventCompleted`), corre la cuenta regresiva y decide quién terminó (`NetRace`: fase, cuenta, hora de salida en el reloj del servidor, `RacerFinishedRpc`). Vueltas/posiciones se calculan en cada máquina con `RaceProgress` sobre las posiciones sincronizadas. "Terminado" es estado local de cada jugador. Volver a la pista solo lo ejecuta quien simula el kart (`RaceProgress.hasAuthority`).
+- Relay siempre por WSS (`NetworkOptions.RelayProtocol = WSS` al crear y al unirse, `UnityTransport.UseWebSockets = true`) para que PC, celular y navegador jueguen juntos.
+- Sala: `NetLobby` (NetworkObject persistente entre escenas) con la lista de jugadores; el host asigna personajes sin repetir. Sala privada, se entra por código (`ISession.Code`). Máx. 5 jugadores; la IA llena los puestos libres.
+- Desconexiones: kart con `DontDestroyWithOwner`; el host lo pasa a la IA (`OnClientLeftRace`). Si se cae el host, los clientes vuelven al menú con mensaje.
+- Separación del modo un jugador: el NetworkManager solo existe en línea (`Resources/Net/NetworkManager.prefab`, lo instancia `OnlineSession`). Los karts en red son variantes de prefab (`Prefabs/Net/Kart_<Nombre>_Net`) generadas por el builder (`SetupNetwork`); el código de red de la carrera está aparte en `RaceManager.Online.cs`. En línea la pausa no detiene el tiempo.
+- Perfil de autenticación al azar por ejecución, para que varias copias en un PC (Play Mode, pestañas) sean jugadores distintos.
+- Pruebas automáticas: `AgentScripts/net_test.sh rebuild` compila una copia de Windows (~2 min, 131 MB, en el scratchpad) que se une con `-sr-join CÓDIGO -sr-autopilot` (`OnlineTestHooks`). OJO: no usar `wait_for` largos mientras se hostea desde el Editor: bloquean el hilo principal y Relay desconecta al host por inactividad (~10 s). Consultar con evals cortos. Con 8 GB de RAM, cerrar Chrome antes de compilar.
 
 ## Cómo maneja Claude el Editor
 - `unity` está en `~/AppData/Local/Unity/bin` (agregarlo al PATH en Bash). Usar `unity command eval_file` con scripts en `AgentScripts/` (fuera de Assets, ignorado por git); el código es el cuerpo de un método, sin `using` (nombres totalmente calificados).

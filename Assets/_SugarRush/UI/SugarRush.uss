@@ -686,6 +686,74 @@
     white-space: normal;
 }
 
+/* ---------- Online ---------- */
+
+.candy-button--sky {
+    background-color: var(--sky);
+}
+
+.candy-input {
+    width: 360px;
+    height: 96px;
+    margin: 10px 12px;
+}
+
+.candy-input > .unity-base-text-field__input,
+.candy-input > .unity-text-field__input {
+    background-color: #FFFFFF;
+    border-width: 6px;
+    border-color: var(--sky);
+    border-radius: 48px;
+    padding: 0 20px;
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/LuckiestGuy-Regular.ttf");
+    font-size: 52px;
+    color: var(--choco);
+    letter-spacing: 6px;
+    -unity-text-align: middle-center;
+    --unity-cursor-color: var(--pink-dark);
+    --unity-selection-color: var(--pink-light);
+}
+
+.candy-input:focus > .unity-base-text-field__input,
+.candy-input:focus > .unity-text-field__input {
+    border-color: var(--pink);
+}
+
+.online-status {
+    font-size: 32px;
+    color: var(--pink-dark);
+    margin-top: 8px;
+    min-height: 44px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+    max-width: 800px;
+}
+
+.room-code {
+    margin: 0 0 4px 0;
+}
+
+.panel-note {
+    font-size: 28px;
+    color: var(--lavender-dark);
+    -unity-text-align: middle-center;
+    margin-bottom: 12px;
+}
+
+.menu-message {
+    font-size: 32px;
+    color: #FFFFFF;
+    background-color: rgba(217, 87, 154, 0.9);
+    border-radius: 30px;
+    border-width: 4px;
+    border-color: #FFFFFF;
+    padding: 8px 28px;
+    margin-top: 12px;
+    white-space: normal;
+    max-width: 640px;
+    -unity-text-align: middle-center;
+}
+
 /* ---------- Results ---------- */
 
 .results-row {

@@ -12,6 +12,10 @@ namespace SugarRush
         public TrackPath path;
         public string racerName;
         public bool isPlayer;
+        [Tooltip("Driven by a person (this machine's player or, online, someone else's).")]
+        public bool isHuman;
+        [Tooltip("Online: only the machine that simulates this kart may teleport it back to the track.")]
+        public bool hasAuthority = true;
 
         [Header("Off track")]
         public float offTrackMargin = 7f;
@@ -169,6 +173,7 @@ namespace SugarRush
         /// <summary>Puts the kart back on the racing line at its current checkpoint, facing forward.</summary>
         public void ReturnToTrack()
         {
+            if (!hasAuthority) return;
             int seg = Segment;
             Vector3 point = path.Point(seg);
             Vector3 dir = path.Direction(seg);

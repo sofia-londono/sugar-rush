@@ -10,7 +10,7 @@ namespace SugarRush
     /// </summary>
     public class MainMenuUI : MonoBehaviour
     {
-        enum Page { Main, Characters, Options }
+        enum Page { Main, Characters, Options, Online, Lobby }
 
         public UIDocument document;
         public KartRoster roster;
@@ -20,6 +20,13 @@ namespace SugarRush
         Page page;
         int previewKart;
         bool leaving;
+
+        // Online widgets
+        Label onlineStatus;
+        TextField codeField;
+        VisualElement onlineButtons, lobbyRows;
+        int shownLobbyVersion = -1;
+        bool connecting;
 
         // Character page widgets that change when cycling karts
         CandyTitle charName;
@@ -32,7 +39,8 @@ namespace SugarRush
             root.Clear();
             root.Add(new SprinkleRain(40));
             previewKart = GameSettings.SelectedKart;
-            ShowPage(Page.Main);
+            // Back from an online race: straight to the waiting room.
+            ShowPage(OnlineSession.IsOnline ? Page.Lobby : Page.Main);
             UIKit.FadeIn(root);
             if (SoundLibrary.Instance) AudioHub.PlayMusic(SoundLibrary.Instance.menuMusic);
         }
@@ -40,9 +48,11 @@ namespace SugarRush
         void Update()
         {
             if (leaving) return;
-            if (page != Page.Main && UIKit.BackPressed())
+            if (page == Page.Lobby) UpdateLobby();
+            if (page != Page.Main && UIKit.BackPressed() && !connecting && !(codeField != null && codeField.focusController?.focusedElement == codeField))
             {
                 AudioHub.UIBack();
+                if (page == Page.Lobby) { LeaveRoom(); return; }
                 if (page == Page.Characters) previewKart = GameSettings.SelectedKart;
                 ShowPage(Page.Main);
                 return;
@@ -62,6 +72,8 @@ namespace SugarRush
             {
                 Page.Characters => BuildCharacters(),
                 Page.Options => BuildOptions(),
+                Page.Online => BuildOnline(),
+                Page.Lobby => BuildLobby(),
                 _ => BuildMain(),
             };
             UIKit.ShowScreen(root, screen);
@@ -81,6 +93,7 @@ namespace SugarRush
 
             var play = UIKit.Button(Loc.T("menu.play"), Play);
             column.Add(play);
+            column.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky"));
             column.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint"));
             column.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender"));
 #if !UNITY_WEBGL
@@ -90,6 +103,12 @@ namespace SugarRush
             float best = GameSettings.GetBestTime(GameSettings.Laps);
             if (best > 0f)
                 column.Add(UIKit.Label(Loc.T("menu.best", GameSettings.Laps, Loc.Time(best)), "small-text"));
+
+            if (!string.IsNullOrEmpty(OnlineSession.PendingMessageKey))
+            {
+                column.Add(UIKit.Label(Loc.T(OnlineSession.PendingMessageKey), "menu-message"));
+                OnlineSession.PendingMessageKey = null;
+            }
 
             screen.Add(UIKit.Label(Loc.T("menu.credits"), "small-text", "footer"));
             UIKit.FocusLater(play);
@@ -111,6 +130,151 @@ namespace SugarRush
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #endif
+        }
+
+        // ------------------------------------------------------------ Online
+
+        VisualElement BuildOnline()
+        {
+            var screen = UIKit.Div("screen");
+            var panel = new FrostingPanel(CandyTone.Sky, 19);
+            panel.AddToClassList("frosting-panel--wide");
+            var heading = UIKit.Title(Loc.T("online.title"), CandyTone.Pink, "candy-title--md");
+            heading.AddToClassList("panel-heading");
+            panel.Add(heading);
+
+            onlineButtons = UIKit.Div("menu-column");
+            var create = UIKit.Button(Loc.T("online.create"), CreateRoom, "candy-button--sky");
+            onlineButtons.Add(create);
+            onlineButtons.Add(UIKit.Label(Loc.T("online.or"), "panel-note"));
+
+            var joinRow = UIKit.Div("row");
+            codeField = new TextField { maxLength = 8, isDelayed = false };
+            codeField.AddToClassList("candy-input");
+            codeField.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) JoinRoom();
+            });
+            joinRow.Add(codeField);
+            joinRow.Add(UIKit.Button(Loc.T("online.join"), JoinRoom, "candy-button--mint", "candy-button--small"));
+            onlineButtons.Add(joinRow);
+            panel.Add(onlineButtons);
+
+            onlineStatus = UIKit.Label("", "online-status");
+            panel.Add(onlineStatus);
+            panel.Add(UIKit.BackButton(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small"));
+
+            screen.Add(panel);
+            UIKit.FocusLater(create);
+            return screen;
+        }
+
+        async void CreateRoom()
+        {
+            if (connecting) return;
+            SetConnecting(true);
+            bool ok = await OnlineSession.CreateRoomAsync();
+            if (!this) return;
+            SetConnecting(false);
+            if (ok) ShowPage(Page.Lobby);
+            else onlineStatus.text = Loc.T("online.error");
+        }
+
+        async void JoinRoom()
+        {
+            if (connecting || codeField == null) return;
+            string code = codeField.value?.Trim();
+            if (string.IsNullOrEmpty(code)) { codeField.Focus(); return; }
+            SetConnecting(true);
+            bool ok = await OnlineSession.JoinRoomAsync(code);
+            if (!this) return;
+            SetConnecting(false);
+            if (ok) ShowPage(Page.Lobby);
+            else onlineStatus.text = Loc.T("online.error");
+        }
+
+        void SetConnecting(bool value)
+        {
+            connecting = value;
+            if (onlineButtons != null) onlineButtons.SetEnabled(!value);
+            if (onlineStatus != null) onlineStatus.text = value ? Loc.T("online.connecting") : "";
+        }
+
+        VisualElement BuildLobby()
+        {
+            var screen = UIKit.Div("screen", "screen--left");
+            var panel = new FrostingPanel(CandyTone.Mint, 29);
+            var heading = UIKit.Title(Loc.T("lobby.title"), CandyTone.Pink, "candy-title--md");
+            heading.AddToClassList("panel-heading");
+            panel.Add(heading);
+
+            var code = UIKit.Title(OnlineSession.Code ?? "------", CandyTone.Lemon, "candy-title--lg");
+            code.AddToClassList("room-code");
+            panel.Add(code);
+            panel.Add(UIKit.Label(Loc.T("lobby.share"), "panel-note"));
+
+            lobbyRows = UIKit.Div();
+            panel.Add(lobbyRows);
+            panel.Add(UIKit.Label(Loc.T("lobby.aiFill"), "panel-note"));
+            shownLobbyVersion = -1;
+
+            var buttons = UIKit.Div("row");
+            Button focus;
+            if (OnlineSession.IsHost)
+            {
+                focus = UIKit.Button(Loc.T("lobby.start"), StartOnlineRace, "candy-button--small");
+                buttons.Add(UIKit.BackButton(Loc.T("lobby.leave"), LeaveRoom, "candy-button--lemon", "candy-button--small"));
+                buttons.Add(focus);
+            }
+            else
+            {
+                panel.Add(UIKit.Label(Loc.T("lobby.waiting"), "online-status"));
+                focus = UIKit.BackButton(Loc.T("lobby.leave"), LeaveRoom, "candy-button--lemon", "candy-button--small");
+                buttons.Add(focus);
+            }
+            panel.Add(buttons);
+            screen.Add(panel);
+            UIKit.FocusLater(focus);
+            return screen;
+        }
+
+        void UpdateLobby()
+        {
+            if (!OnlineSession.IsOnline) { ShowPage(Page.Main); return; }
+            var lobby = NetLobby.Instance;
+            if (!lobby || lobbyRows == null || lobby.Version == shownLobbyVersion) return;
+            shownLobbyVersion = lobby.Version;
+
+            lobbyRows.Clear();
+            ulong me = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+            foreach (var p in lobby.Players)
+            {
+                var row = UIKit.Div("results-row");
+                if (p.ClientId == me) row.AddToClassList("results-row--player");
+                row.Add(UIKit.Label(p.Number + ".", "results-row__pos"));
+                row.Add(UIKit.Label(roster.Get(p.Kart).displayName, "results-row__name"));
+                string tag = p.ClientId == me ? Loc.T("lobby.you") : Loc.T("lobby.player", p.Number);
+                if (p.ClientId == Unity.Netcode.NetworkManager.ServerClientId) tag += " · " + Loc.T("lobby.host");
+                row.Add(UIKit.Label(tag, "results-row__time"));
+                lobbyRows.Add(row);
+                if (p.ClientId == me) showcase.Show(p.Kart);
+            }
+        }
+
+        void StartOnlineRace()
+        {
+            if (leaving || !NetLobby.Instance) return;
+            leaving = true;
+            AudioHub.UIConfirm();
+            GameSettings.Save();
+            UIKit.FadeOut(root, () => NetLobby.Instance.StartRace());
+        }
+
+        void LeaveRoom()
+        {
+            if (leaving) return;
+            leaving = true;
+            UIKit.FadeOut(root, () => OnlineSession.LeaveToMenu());
         }
 
         // ------------------------------------------------------------ Characters

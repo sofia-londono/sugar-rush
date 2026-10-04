@@ -5,6 +5,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine.UIElements;
 
 namespace SugarRush.EditorTools
@@ -30,6 +32,9 @@ namespace SugarRush.EditorTools
         const string DifficultyPath = AIDir + "/AIDifficulty.asset";
         const string AudioDir = Root + "/Audio";
         const string SoundLibraryPath = Root + "/Resources/SoundLibrary.asset";
+        const string NetPrefabsDir = PrefabsDir + "/Net";
+        const string NetResourcesDir = Root + "/Resources/Net";
+        const string NetworkPrefabsListPath = DataDir + "/Net/NetworkPrefabs.asset";
         const string PanelSettingsPath = UIDir + "/PanelSettings.asset";
         const string RaceScenePath = Root + "/Scenes/" + SceneNames.Race + ".unity";
         const string MenuScenePath = Root + "/Scenes/" + SceneNames.MainMenu + ".unity";
@@ -87,6 +92,7 @@ namespace SugarRush.EditorTools
             log.AppendLine(SetupKartMaterials());
             log.AppendLine(BuildKartPrefabs());
             log.AppendLine(SetupAI());
+            log.AppendLine(SetupNetwork());
             log.AppendLine(SetupAudio());
             log.AppendLine(SetupTrackImport());
             log.AppendLine(SetupUIAssets());
@@ -343,6 +349,75 @@ namespace SugarRush.EditorTools
         {
             foreach (var entry in roster.karts)
                 entry.personality = AssetDatabase.LoadAssetAtPath<AIPersonality>($"{AIDir}/AI_{entry.id}.asset");
+        }
+
+        // ---------------------------------------------------------------- Network
+
+        /// <summary>
+        /// Online assets: a prefab variant of every kart with NetworkObject + NetKart (variants
+        /// follow any change to the single player prefabs), the room and race-state prefabs, the
+        /// network prefab list, and a NetworkManager prefab (20 ticks/s, WebSockets for WSS relay).
+        /// Single player never loads any of these.
+        /// </summary>
+        [MenuItem("Sugar Rush/Network Assets")]
+        public static string SetupNetwork()
+        {
+            EnsureFolder(NetPrefabsDir);
+            EnsureFolder(NetResourcesDir);
+            EnsureFolder(DataDir + "/Net");
+            var roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            var networked = new List<GameObject>();
+
+            foreach (var entry in roster.karts)
+            {
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(entry.prefab);
+                var netObj = instance.AddComponent<NetworkObject>();
+                netObj.DontDestroyWithOwner = true; // a player who leaves hands the kart to the AI
+                netObj.AutoObjectParentSync = false;
+                instance.AddComponent<NetKart>();
+                var variant = PrefabUtility.SaveAsPrefabAsset(instance, $"{NetPrefabsDir}/Kart_{entry.id}_Net.prefab");
+                Object.DestroyImmediate(instance);
+                entry.netPrefab = variant;
+                networked.Add(variant);
+            }
+            EditorUtility.SetDirty(roster);
+
+            GameObject NetPrefab<T>(string name, System.Action<T> setup = null) where T : Component
+            {
+                var go = new GameObject(name);
+                go.AddComponent<NetworkObject>();
+                var component = go.AddComponent<T>();
+                setup?.Invoke(component);
+                var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{NetResourcesDir}/{name}.prefab");
+                Object.DestroyImmediate(go);
+                return prefab;
+            }
+            networked.Add(NetPrefab<NetLobby>("NetLobby", lobby => lobby.roster = roster));
+            networked.Add(NetPrefab<NetRace>("NetRace"));
+
+            AssetDatabase.DeleteAsset(NetworkPrefabsListPath);
+            var list = ScriptableObject.CreateInstance<NetworkPrefabsList>();
+            foreach (var prefab in networked) list.Add(new NetworkPrefab { Prefab = prefab });
+            AssetDatabase.CreateAsset(list, NetworkPrefabsListPath);
+
+            var managerGo = new GameObject("NetworkManager");
+            var transport = managerGo.AddComponent<UnityTransport>();
+            transport.UseWebSockets = true;
+            var manager = managerGo.AddComponent<NetworkManager>();
+            manager.NetworkConfig ??= new NetworkConfig();
+            manager.NetworkConfig.NetworkTransport = transport;
+            manager.NetworkConfig.TickRate = 20;
+            manager.NetworkConfig.EnableSceneManagement = true;
+            manager.NetworkConfig.ConnectionApproval = false;
+            manager.NetworkConfig.ForceSamePrefabs = true;
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(list);
+            manager.RunInBackground = true;
+            PrefabUtility.SaveAsPrefabAsset(managerGo, $"{NetResourcesDir}/NetworkManager.prefab");
+            Object.DestroyImmediate(managerGo);
+
+            AssetDatabase.SaveAssets();
+            return $"Network: {roster.karts.Length} kart variants, {networked.Count} network prefabs, NetworkManager @20 ticks";
         }
 
         // ---------------------------------------------------------------- Audio

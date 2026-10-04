@@ -16,6 +16,7 @@ MonoBehaviour:
   - id: Vanellope
     displayName: Vanellope von Schweetz
     prefab: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+    netPrefab: {fileID: 3897173490157374037, guid: c1d2919bc6d6a2a42957111e6a7f4500, type: 3}
     color: {r: 0.55, g: 0.85, b: 0.75, a: 1}
     speed: 0.5555556
     acceleration: 0.7
@@ -24,6 +25,7 @@ MonoBehaviour:
   - id: Taffyta
     displayName: Taffyta Muttonfudge
     prefab: {fileID: 3527243718002122580, guid: 0d04d8c548f144d4a9b392f6aabf6aae, type: 3}
+    netPrefab: {fileID: 5494698863772410300, guid: dd1357aa383c68a4d97c1b9ba8ef16d6, type: 3}
     color: {r: 1, g: 0.55, b: 0.78, a: 1}
     speed: 0.8888889
     acceleration: 0.2
@@ -32,6 +34,7 @@ MonoBehaviour:
   - id: Adorabeezle
     displayName: Adorabeezle Winterpop
     prefab: {fileID: 1048769069955946598, guid: 1c7970039abc8644688134c9d737f8f2, type: 3}
+    netPrefab: {fileID: 511959893189933647, guid: d52dea68e9ab4414f8538a7f425904bc, type: 3}
     color: {r: 0.56, g: 0.82, b: 1, a: 1}
     speed: 0.33333334
     acceleration: 0.9
@@ -40,6 +43,7 @@ MonoBehaviour:
   - id: Rancis
     displayName: Rancis Fluggerbutter
     prefab: {fileID: 3815348446234820329, guid: 68e4e9ad015d5864c9fbeaf25905f922, type: 3}
+    netPrefab: {fileID: 4575756356339714291, guid: e213099926f86014392fe7e45994a6f1, type: 3}
     color: {r: 1, g: 0.85, b: 0.45, a: 1}
     speed: 0.7777778
     acceleration: 0.4
@@ -48,6 +52,7 @@ MonoBehaviour:
   - id: Candlehead
     displayName: Candlehead
     prefab: {fileID: 7925114480421620970, guid: a4edab2196df154458a4d375e79d5756, type: 3}
+    netPrefab: {fileID: 6285719010409999204, guid: d14a4239ae01ae5429d1ccc7827f5c1c, type: 3}
     color: {r: 0.76, g: 0.64, b: 1, a: 1}
     speed: 0.44444445
     acceleration: 0.8

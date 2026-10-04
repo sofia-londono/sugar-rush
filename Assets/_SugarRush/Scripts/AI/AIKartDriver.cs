@@ -138,9 +138,10 @@ namespace SugarRush
         void UpdateRubberBand(RaceManager manager, float dt)
         {
             float target = 1f;
-            if (manager && manager.Player && manager.Player != progress && !manager.Player.Finished)
+            var human = manager ? manager.LeadingHuman : null;
+            if (human && human != progress)
             {
-                float gap = manager.Player.RaceDistance - progress.RaceDistance; // > 0: this racer is behind
+                float gap = human.RaceDistance - progress.RaceDistance; // > 0: this racer is behind
                 float range = Mathf.Max(1f, difficulty.rubberBandDistance);
                 target = 1f + difficulty.catchUpBoost * Mathf.Clamp01(gap / range)
                             - difficulty.leadSlowdown * Mathf.Clamp01(-gap / range);

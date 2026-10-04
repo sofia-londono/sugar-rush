@@ -57,12 +57,18 @@ namespace SugarRush
         public System.Action RespawnOverride;
 
         public float ForwardSpeed { get; private set; }
-        public float Speed => rb ? rb.linearVelocity.magnitude : 0f;
+        public float Speed => IsProxy ? proxySpeed : (rb ? rb.linearVelocity.magnitude : 0f);
         public bool IsGrounded { get; private set; }
         public bool IsDrifting { get; private set; }
         public int DriftDirection { get; private set; }
         public int DriftLevel { get; private set; }
-        public bool IsBoosting => boostTimer > 0f;
+        public bool IsBoosting => IsProxy ? proxyBoosting : boostTimer > 0f;
+        public Rigidbody Body => rb;
+
+        /// <summary>Online: this kart is someone else's, shown from network snapshots (no physics here).</summary>
+        public bool IsProxy { get; private set; }
+        float proxySpeed;
+        bool proxyBoosting;
         public float MaxSpeed => maxSpeed;
 
         Rigidbody rb;
@@ -100,6 +106,7 @@ namespace SugarRush
 
         void FixedUpdate()
         {
+            if (IsProxy) return;
             float dt = Time.fixedDeltaTime;
             ApplySuspension();
 
@@ -235,6 +242,33 @@ namespace SugarRush
             IsDrifting = false;
             DriftLevel = 0;
             driftTime = 0f;
+        }
+
+        /// <summary>
+        /// Online: switch between simulating this kart and showing it as a kinematic proxy whose
+        /// collider is a trigger (contacts with proxies become simple pushes, see NetKart).
+        /// </summary>
+        public void SetProxy(bool proxy)
+        {
+            if (!rb) rb = GetComponent<Rigidbody>();
+            IsProxy = proxy;
+            rb.collisionDetectionMode = proxy ? CollisionDetectionMode.Discrete : CollisionDetectionMode.ContinuousDynamic;
+            rb.isKinematic = proxy;
+            rb.interpolation = proxy ? RigidbodyInterpolation.None : RigidbodyInterpolation.Interpolate;
+            foreach (var c in GetComponents<Collider>()) c.isTrigger = proxy;
+            if (proxy) { Throttle = 0f; Steer = 0f; DriftHeld = false; IsDrifting = false; boostTimer = 0f; }
+        }
+
+        /// <summary>Online proxies: values for visuals and sound, taken from the latest snapshot.</summary>
+        public void ApplyProxyState(float forwardSpeed, float speed, float steer, bool grounded, bool drifting, int driftDirection, bool boosting)
+        {
+            ForwardSpeed = forwardSpeed;
+            proxySpeed = speed;
+            Steer = steer;
+            IsGrounded = grounded;
+            IsDrifting = drifting;
+            DriftDirection = driftDirection;
+            proxyBoosting = boosting;
         }
 
         public void Boost(float duration) => boostTimer = Mathf.Max(boostTimer, duration);

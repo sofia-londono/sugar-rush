@@ -14,6 +14,8 @@ namespace SugarRush
             public string id;
             public string displayName;
             public GameObject prefab;
+            [Tooltip("Online variant of the prefab (NetworkObject + NetKart).")]
+            public GameObject netPrefab;
             public Color color = Color.white;
             [Range(0, 1)] public float speed;
             [Range(0, 1)] public float acceleration;

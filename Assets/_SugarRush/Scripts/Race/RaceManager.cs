@@ -8,8 +8,9 @@ namespace SugarRush
     /// <summary>
     /// Runs a race: spawns the player and AI karts on the grid, counts down, ranks racers,
     /// detects the finish, and handles pause / restart / quit to menu.
+    /// Online races are handled in RaceManager.Online.cs; everything here is the single player flow.
     /// </summary>
-    public class RaceManager : MonoBehaviour
+    public partial class RaceManager : MonoBehaviour
     {
         public enum State { Countdown, Racing, Finished }
 
@@ -41,7 +42,7 @@ namespace SugarRush
 
         int finishedCount;
 
-        AIDifficulty.Level DifficultyLevel => aiDifficulty ? aiDifficulty.Get(GameSettings.Difficulty) : new AIDifficulty.Level();
+        public AIDifficulty.Level DifficultyLevel => aiDifficulty ? aiDifficulty.Get(GameSettings.Difficulty) : new AIDifficulty.Level();
 
         public bool CanDrive(RaceProgress racer) =>
             CurrentState != State.Countdown && !(racer && racer.isPlayer && racer.Finished);
@@ -61,8 +62,21 @@ namespace SugarRush
 
         void Start()
         {
+            if (IsOnline) { StartOnline(); return; }
             SpawnRacers();
             StartCoroutine(CountdownRoutine());
+        }
+
+        /// <summary>The human furthest along the track (rubber banding reference for the AI).</summary>
+        public RaceProgress LeadingHuman
+        {
+            get
+            {
+                RaceProgress best = null;
+                foreach (var r in Racers)
+                    if (r.isHuman && !r.Finished && (!best || r.RaceDistance > best.RaceDistance)) best = r;
+                return best;
+            }
         }
 
         void SpawnRacers()
@@ -95,6 +109,7 @@ namespace SugarRush
                 progress.path = path;
                 progress.racerName = entry.displayName;
                 progress.isPlayer = order[slot] == playerIndex;
+                progress.isHuman = progress.isPlayer;
                 progress.LapCompleted += OnLapCompleted;
                 Racers.Add(progress);
 
@@ -147,7 +162,8 @@ namespace SugarRush
 
         void Update()
         {
-            if (CurrentState != State.Countdown) RaceTime += Time.deltaTime;
+            if (IsOnline) UpdateOnline();
+            else if (CurrentState != State.Countdown) RaceTime += Time.deltaTime;
             UpdatePositions();
         }
 
@@ -164,6 +180,7 @@ namespace SugarRush
 
         void OnLapCompleted(RaceProgress racer)
         {
+            if (IsOnline) { OnLapCompletedOnline(racer); return; }
             if (CurrentState == State.Countdown || racer.Finished) return;
             RacerLapCompleted?.Invoke(racer);
             if (racer.CompletedLaps < Laps) return;
@@ -192,6 +209,12 @@ namespace SugarRush
         public void SetPaused(bool paused)
         {
             IsPaused = paused;
+            if (IsOnline)
+            {
+                // Online the race can't stop for one player: just show the menu and coast.
+                AudioHub.Instance.Duck(paused);
+                return;
+            }
             Time.timeScale = paused ? 0f : 1f;
             AudioListener.pause = paused; // pauses engines; music and menu sounds ignore it
             AudioHub.Instance.Duck(paused);
@@ -206,12 +229,20 @@ namespace SugarRush
         public void Restart()
         {
             SetPaused(false);
+            if (IsOnline) { if (NetLobby.Instance) NetLobby.Instance.StartRace(); return; }
             SceneManager.LoadScene(SceneNames.Race);
         }
 
         public void QuitToMenu()
         {
             SetPaused(false);
+            if (IsOnline)
+            {
+                // Host takes everyone back to the room; a guest leaves the room.
+                if (OnlineSession.IsHost && NetLobby.Instance) NetLobby.Instance.BackToRoom();
+                else OnlineSession.LeaveToMenu();
+                return;
+            }
             SceneManager.LoadScene(SceneNames.MainMenu);
         }
     }

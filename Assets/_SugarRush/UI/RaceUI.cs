@@ -205,13 +205,17 @@ namespace SugarRush
             panel.Add(heading);
             var resume = UIKit.Button(Loc.T("pause.resume"), () => SetPaused(false));
             panel.Add(resume);
-            panel.Add(UIKit.Button(Loc.T("pause.restart"), () => LeaveTo(race.Restart), "candy-button--mint"));
+            bool guest = race.IsOnline && !OnlineSession.IsHost;
+            if (!guest) panel.Add(UIKit.Button(Loc.T("pause.restart"), () => LeaveTo(race.Restart), "candy-button--mint"));
             panel.Add(UIKit.Button(Loc.T("pause.checkpoint"), () => { CloseOverlay(); race.PlayerBackToTrack(); }, "candy-button--lavender"));
-            panel.Add(UIKit.Button(Loc.T("pause.mainMenu"), () => LeaveTo(race.QuitToMenu), "candy-button--lemon"));
+            panel.Add(UIKit.BackButton(Loc.T(QuitKey), () => LeaveTo(race.QuitToMenu), "candy-button--lemon"));
             overlay.Add(panel);
             UIKit.Enter(root, overlay);
             UIKit.FocusLater(resume);
         }
+
+        /// <summary>Online the host takes everyone back to the room, a guest leaves it.</summary>
+        string QuitKey => !race.IsOnline ? "pause.mainMenu" : OnlineSession.IsHost ? "lobby.backToRoom" : "lobby.leave";
 
         void CloseOverlay()
         {
@@ -248,9 +252,19 @@ namespace SugarRush
             panel.Add(UIKit.Label(Loc.T("results.bestLap", Loc.Time(player.BestLap)), "results-highlight"));
 
             var buttons = UIKit.Div("row");
-            var again = UIKit.Button(Loc.T("results.retry"), () => LeaveTo(race.Restart), "candy-button--small");
-            buttons.Add(again);
-            buttons.Add(UIKit.Button(Loc.T("pause.mainMenu"), () => LeaveTo(race.QuitToMenu), "candy-button--lemon", "candy-button--small"));
+            Button again;
+            if (race.IsOnline && !OnlineSession.IsHost)
+            {
+                panel.Add(UIKit.Label(Loc.T("lobby.waiting"), "panel-note"));
+                again = UIKit.BackButton(Loc.T("lobby.leave"), () => LeaveTo(race.QuitToMenu), "candy-button--lemon", "candy-button--small");
+                buttons.Add(again);
+            }
+            else
+            {
+                again = UIKit.Button(Loc.T("results.retry"), () => LeaveTo(race.Restart), "candy-button--small");
+                buttons.Add(again);
+                buttons.Add(UIKit.BackButton(Loc.T(QuitKey), () => LeaveTo(race.QuitToMenu), "candy-button--lemon", "candy-button--small"));
+            }
             panel.Add(buttons);
 
             overlay.Add(panel);

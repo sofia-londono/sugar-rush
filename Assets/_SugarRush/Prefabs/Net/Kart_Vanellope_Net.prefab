@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &446825070281232071
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1818905035832936238, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      propertyPath: m_Name
+      value: Kart_Vanellope_Net
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 573272962822463570}
+    - targetCorrespondingSourceObject: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7061861096554642121}
+  m_SourcePrefab: {fileID: 100100000, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+--- !u!1 &3897173490157374037 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3469737281541915794, guid: b413f84b0edd39e42a442183a9790f64, type: 3}
+  m_PrefabInstance: {fileID: 446825070281232071}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &573272962822463570
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3897173490157374037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 4029609929
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  m_InScenePlaced: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 1
+  AutoObjectParentSync: 0
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!114 &7061861096554642121
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3897173490157374037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a9cf33ba02dee346a0c2ea0e641b9c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SugarRush.NetKart
+  ShowTopMostFoldoutHeaderGroup: 1
+  sendRate: 20
+  interpolationDelay: 0.12
+  maxExtrapolation: 0.25
+  teleportDistance: 12
+  pushStrength: 5

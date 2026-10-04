@@ -21,6 +21,27 @@ namespace SugarRush
                                 "Non-profit fan game · 3D models: RazyBerry & amogusstrikesback2 (CC BY 4.0) · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
             ["menu.best"] = ("Récord ({0} vueltas): {1}", "Best ({0} laps): {1}"),
 
+            // Online
+            ["menu.online"] = ("Jugar en línea", "Play online"),
+            ["online.title"] = ("Jugar en línea", "Play online"),
+            ["online.create"] = ("Crear sala", "Create room"),
+            ["online.join"] = ("Unirse", "Join"),
+            ["online.or"] = ("o únete con un código", "or join with a code"),
+            ["online.codeHint"] = ("CÓDIGO", "CODE"),
+            ["online.connecting"] = ("Conectando...", "Connecting..."),
+            ["online.error"] = ("No se pudo conectar. Revisa el código y tu internet.", "Couldn't connect. Check the code and your internet."),
+            ["online.lost"] = ("Se perdió la conexión con la sala", "Lost connection to the room"),
+            ["lobby.title"] = ("Sala de espera", "Waiting room"),
+            ["lobby.share"] = ("Comparte este código con tus amigos", "Share this code with your friends"),
+            ["lobby.player"] = ("Jugador {0}", "Player {0}"),
+            ["lobby.you"] = ("tú", "you"),
+            ["lobby.host"] = ("anfitrión", "host"),
+            ["lobby.start"] = ("¡Empezar!", "Start!"),
+            ["lobby.leave"] = ("Salir de la sala", "Leave room"),
+            ["lobby.waiting"] = ("Esperando a que el anfitrión empiece...", "Waiting for the host to start..."),
+            ["lobby.aiFill"] = ("Los puestos libres los corre la IA", "Empty spots are raced by the AI"),
+            ["lobby.backToRoom"] = ("Volver a la sala", "Back to room"),
+
             // Characters
             ["char.title"] = ("Elige tu corredor", "Choose your racer"),
             ["char.speed"] = ("Velocidad", "Speed"),
