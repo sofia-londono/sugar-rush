@@ -25,6 +25,7 @@ namespace SugarRush
         Label onlineStatus;
         TextField codeField;
         VisualElement onlineButtons, lobbyRows;
+        CandyTitle lobbyKartName, lobbyCount;
         int shownLobbyVersion = -1;
         bool connecting;
 
@@ -177,7 +178,7 @@ namespace SugarRush
             if (!this) return;
             SetConnecting(false);
             if (ok) ShowPage(Page.Lobby);
-            else onlineStatus.text = Loc.T("online.error");
+            else onlineStatus.text = Loc.T(OnlineSession.LastErrorKey ?? "online.error");
         }
 
         async void JoinRoom()
@@ -190,7 +191,7 @@ namespace SugarRush
             if (!this) return;
             SetConnecting(false);
             if (ok) ShowPage(Page.Lobby);
-            else onlineStatus.text = Loc.T("online.error");
+            else onlineStatus.text = Loc.T(OnlineSession.LastErrorKey ?? "online.error");
         }
 
         void SetConnecting(bool value)
@@ -213,10 +214,22 @@ namespace SugarRush
             panel.Add(code);
             panel.Add(UIKit.Label(Loc.T("lobby.share"), "panel-note"));
 
+            lobbyCount = UIKit.Title("", CandyTone.Lavender, "candy-title--sm");
+            panel.Add(lobbyCount);
             lobbyRows = UIKit.Div();
             panel.Add(lobbyRows);
             panel.Add(UIKit.Label(Loc.T("lobby.aiFill"), "panel-note"));
             shownLobbyVersion = -1;
+
+            // Pick a racer here; ones another player already has are skipped.
+            var pickRow = UIKit.Div("row", "lobby-pick");
+            pickRow.Add(UIKit.Label(Loc.T("lobby.yourRacer"), "option-row__label"));
+            pickRow.Add(UIKit.ArrowButton("‹", () => CycleLobbyKart(-1), small: true));
+            lobbyKartName = UIKit.Title("", CandyTone.Pink, "candy-title--sm");
+            lobbyKartName.AddToClassList("lobby-pick__name");
+            pickRow.Add(lobbyKartName);
+            pickRow.Add(UIKit.ArrowButton("›", () => CycleLobbyKart(1), small: true));
+            panel.Add(pickRow);
 
             var buttons = UIKit.Div("row");
             Button focus;
@@ -241,12 +254,15 @@ namespace SugarRush
         void UpdateLobby()
         {
             if (!OnlineSession.IsOnline) { ShowPage(Page.Main); return; }
+            int dir = UIKit.HorizontalPressed();
+            if (dir != 0) { AudioHub.UIMove(); CycleLobbyKart(dir); }
             var lobby = NetLobby.Instance;
             if (!lobby || lobbyRows == null || lobby.Version == shownLobbyVersion) return;
             shownLobbyVersion = lobby.Version;
 
             lobbyRows.Clear();
             ulong me = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+            lobbyCount.Text = Loc.T("lobby.count", lobby.Players.Count, OnlineSession.MaxPlayers);
             foreach (var p in lobby.Players)
             {
                 var row = UIKit.Div("results-row");
@@ -257,8 +273,24 @@ namespace SugarRush
                 if (p.ClientId == Unity.Netcode.NetworkManager.ServerClientId) tag += " · " + Loc.T("lobby.host");
                 row.Add(UIKit.Label(tag, "results-row__time"));
                 lobbyRows.Add(row);
-                if (p.ClientId == me) showcase.Show(p.Kart);
+                if (p.ClientId == me)
+                {
+                    showcase.Show(p.Kart);
+                    if (lobbyKartName.Text != roster.Get(p.Kart).displayName) UIKit.Pop(lobbyKartName);
+                    lobbyKartName.Text = roster.Get(p.Kart).displayName;
+                    GameSettings.SelectedKart = p.Kart;
+                }
             }
+        }
+
+        /// <summary>Asks the host for the next racer nobody else in the room is driving.</summary>
+        void CycleLobbyKart(int direction)
+        {
+            var lobby = NetLobby.Instance;
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (!lobby || !nm || !lobby.TryGetPlayer(nm.LocalClientId, out var me)) return;
+            int next = lobby.NextFreeKart(me.Kart, direction, nm.LocalClientId);
+            if (next != me.Kart) lobby.RequestKartRpc(next);
         }
 
         void StartOnlineRace()

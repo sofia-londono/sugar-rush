@@ -754,6 +754,14 @@
     -unity-text-align: middle-center;
 }
 
+.lobby-pick {
+    margin: 4px 0 8px 0;
+}
+
+.lobby-pick__name {
+    min-width: 440px;
+}
+
 /* ---------- Results ---------- */
 
 .results-row {

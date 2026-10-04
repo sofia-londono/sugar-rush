@@ -144,10 +144,23 @@ namespace SugarRush
             AddPlayer(sender, kart);
         }
 
-        /// <summary>Host only: everyone goes to the race track.</summary>
+        /// <summary>Next racer in the given direction that nobody else in the room is driving.</summary>
+        public int NextFreeKart(int current, int direction, ulong clientId)
+        {
+            int count = KartCount;
+            for (int step = 1; step <= count; step++)
+            {
+                int k = ((current + direction * step) % count + count) % count;
+                if (!IsKartTaken(k, clientId)) return k;
+            }
+            return current;
+        }
+
+        /// <summary>Host only: everyone goes to the race track (the room is locked meanwhile).</summary>
         public void StartRace()
         {
             if (!IsServer) return;
+            OnlineSession.SetRoomLocked(true);
             NetworkManager.SceneManager.LoadScene(SceneNames.Race, LoadSceneMode.Single);
         }
 
@@ -155,6 +168,7 @@ namespace SugarRush
         public void BackToRoom()
         {
             if (!IsServer) return;
+            OnlineSession.SetRoomLocked(false);
             NetworkManager.SceneManager.LoadScene(SceneNames.MainMenu, LoadSceneMode.Single);
         }
     }

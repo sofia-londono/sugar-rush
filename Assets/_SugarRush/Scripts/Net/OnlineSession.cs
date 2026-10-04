@@ -26,6 +26,8 @@ namespace SugarRush
         public static bool IsHost => IsOnline && NetworkManager.Singleton.IsHost;
         public static string Code => Session?.Code;
         public static string LastError { get; private set; }
+        /// <summary>Loc key explaining the last failure to the player.</summary>
+        public static string LastErrorKey { get; private set; }
 
         /// <summary>Loc key of a message for the main menu to show (e.g. connection lost).</summary>
         public static string PendingMessageKey { get; set; }
@@ -51,8 +53,11 @@ namespace SugarRush
             if (NetworkManager.Singleton) return;
             var go = UnityEngine.Object.Instantiate(Resources.Load<GameObject>(NetworkManagerResource));
             go.name = "NetworkManager";
-            go.GetComponent<UnityTransport>().UseWebSockets = true; // WSS relay on every platform
+            var transport = go.GetComponent<UnityTransport>();
+            transport.UseWebSockets = true;    // WSS relay on every platform
+            transport.MaxPacketQueueSize = 512; // headroom for 5 karts when a frame takes long
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+            NetworkManager.Singleton.OnTransportFailure += OnTransportFailure;
         }
 
         static NetworkOptions SecureWebSockets => new() { RelayProtocol = RelayProtocol.WSS };
@@ -74,10 +79,36 @@ namespace SugarRush
             }
             catch (Exception e)
             {
-                LastError = e.Message;
-                Debug.LogException(e);
+                Fail(e);
                 await CleanupAsync();
                 return false;
+            }
+        }
+
+        static void Fail(Exception e)
+        {
+            LastError = e.Message;
+            string text = (e.Message + " " + e.InnerException?.Message).ToLowerInvariant();
+            LastErrorKey = text.Contains("full") ? "online.full"
+                : text.Contains("locked") ? "online.locked"
+                : e is SessionException { Error: SessionError.SessionNotFound } || text.Contains("not found") || text.Contains("invalid") ? "online.notFound"
+                : "online.error";
+            Debug.LogWarning($"[SR] online failure ({LastErrorKey}): {e}");
+        }
+
+        /// <summary>Host: lock the room while racing so nobody joins mid-race; unlock back in the room.</summary>
+        public static async void SetRoomLocked(bool locked)
+        {
+            if (Session == null || !Session.IsHost || Session.IsLocked == locked) return;
+            try
+            {
+                var host = Session.AsHost();
+                host.IsLocked = locked;
+                await host.SavePropertiesAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Could not change the room lock: " + e.Message);
             }
         }
 
@@ -87,6 +118,7 @@ namespace SugarRush
             try
             {
                 LastError = null;
+                LastErrorKey = null;
                 await EnsureSignedInAsync();
                 EnsureNetworkManager();
                 var options = new JoinSessionOptions().WithNetworkOptions(SecureWebSockets);
@@ -95,8 +127,7 @@ namespace SugarRush
             }
             catch (Exception e)
             {
-                LastError = e.Message;
-                Debug.LogException(e);
+                Fail(e);
                 await CleanupAsync();
                 return false;
             }
@@ -133,10 +164,17 @@ namespace SugarRush
             if (nm)
             {
                 nm.OnClientDisconnectCallback -= OnClientDisconnect;
+                nm.OnTransportFailure -= OnTransportFailure;
                 if (nm.IsListening) nm.Shutdown();
                 UnityEngine.Object.Destroy(nm.gameObject);
             }
             return Task.CompletedTask;
+        }
+
+        /// <summary>The relay connection broke (host or guest): back to the menu with a message.</summary>
+        static void OnTransportFailure()
+        {
+            if (!leaving) LeaveToMenu("online.lost");
         }
 
         static void OnClientDisconnect(ulong clientId)

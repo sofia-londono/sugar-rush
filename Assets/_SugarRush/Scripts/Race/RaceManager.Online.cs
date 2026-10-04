@@ -113,6 +113,10 @@ namespace SugarRush
             bool racing = phase == State.Racing;
             RaceTime = racing ? (float)(NetworkManager.Singleton.ServerTime.Time - netRace.StartTime.Value) : 0f;
 
+            // No kart of our own (joined as the race was starting): watch the leader.
+            if (!Player && kartCamera && Racers.Count > 0 && (!kartCamera.target || kartCamera.target != Racers[0].Kart))
+                kartCamera.target = Racers[0].Kart;
+
             if (CurrentState == State.Countdown && racing)
             {
                 foreach (var r in Racers) r.MarkLapStart(0f);
@@ -133,7 +137,10 @@ namespace SugarRush
             var progress = go.GetComponent<RaceProgress>();
             if (!progress) progress = go.AddComponent<RaceProgress>();
             progress.path = path;
-            progress.racerName = entry.displayName;
+            // People keep their player tag in the results, even if the AI took over after they left.
+            progress.racerName = net.Human.Value
+                ? $"{entry.displayName} ({Loc.T("lobby.short", net.PlayerNumber.Value)})"
+                : entry.displayName;
             progress.LapCompleted += OnLapCompleted;
             net.Progress = progress;
             Racers.Add(progress);
@@ -158,6 +165,7 @@ namespace SugarRush
             var audio = net.GetComponent<KartAudio>();
             if (audio) audio.isPlayer = net.IsMine;
 
+            if (!net.IsMine && Player == progress) Player = null;
             if (net.IsMine && Player != progress)
             {
                 Player = progress;
@@ -185,8 +193,9 @@ namespace SugarRush
             {
                 var net = r.GetComponent<NetKart>();
                 if (!net || !net.Human.Value || net.HumanClientId.Value != clientId) continue;
-                if (net.OwnerClientId != NetworkManager.ServerClientId) net.NetworkObject.ChangeOwnership(NetworkManager.ServerClientId);
+                // Mark it as AI first, so taking ownership never looks like "my own kart" to the host.
                 net.Human.Value = false;
+                if (net.OwnerClientId != NetworkManager.ServerClientId) net.NetworkObject.ChangeOwnership(NetworkManager.ServerClientId);
                 net.ApplyAuthority();
             }
         }

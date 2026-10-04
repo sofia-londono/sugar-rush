@@ -42,7 +42,7 @@ namespace SugarRush
         public KartController Kart { get; private set; }
         public RaceProgress Progress { get; set; }
         /// <summary>This machine's own human kart.</summary>
-        public bool IsMine => IsOwner && Human.Value;
+        public bool IsMine => IsSpawned && IsOwner && Human.Value && HumanClientId.Value == NetworkManager.LocalClientId;
 
         struct Setup { public int Character; public bool Human; public ulong HumanClientId; public int PlayerNumber; }
         Setup? pendingSetup;
