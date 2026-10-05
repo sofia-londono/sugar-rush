@@ -44,8 +44,8 @@ MonoBehaviour:
     acceleration: 0.9
     handling: 0.9375
     personality: {fileID: 11400000, guid: 0e4c18eefa3e04b4dbe6543b11cfdd31, type: 2}
-    character: {fileID: 0}
-    portrait: {fileID: 2800000, guid: 25dc3507399bf2946bd8c7f337ae8358, type: 3}
+    character: {fileID: 8683256696414191699, guid: 5ae6298ddf08cc44c9a9cf8333a2476f, type: 3}
+    portrait: {fileID: 0}
   - id: Rancis
     displayName: Rancis Fluggerbutter
     prefab: {fileID: 3815348446234820329, guid: 68e4e9ad015d5864c9fbeaf25905f922, type: 3}

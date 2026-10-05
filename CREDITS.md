@@ -12,12 +12,13 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
   (importado del GLB con `GlbImport`; textura del cuerpo reducida a 1024 px)
 - **Vanellope von Schweetz** — guinavarro.al
   https://sketchfab.com/3d-models/vanellope-von-schweetz-c7e57d22abd345fc879617884fbb3d46
-- **Taffyta Muttonfudge**, **Candlehead** y **Rancis Fluggerbutter** — Kit7207 (https://sketchfab.com/pmino7207)
+- **Taffyta Muttonfudge**, **Candlehead**, **Rancis Fluggerbutter** y **Adorabeezle Winterpop** — Kit7207 (https://sketchfab.com/pmino7207)
   https://sketchfab.com/3d-models/taffyta-muttonfudge-4574790598c5432ea45098329d050271
   https://sketchfab.com/3d-models/candlehead-f54da0d8cd864f80be2b2e14b5c4d685
   https://sketchfab.com/3d-models/rancis-fluggerbutter-2d1e73a23d734dceaa8133c695ce3be4
-  (simplificados con `MeshDecimator`: Taffyta 24.784 → 7.500 triángulos, Candlehead 31.008 → 8.000, Rancis 22.540 → 7.500)
-- Adorabeezle Winterpop: sin modelo 3D por ahora; retrato dibujado por código (propio).
+  https://sketchfab.com/3d-models/adorabeezle-winterpop-e1a81ecb21e740a5ae55e91e7f95dbdc
+  (simplificados con `MeshDecimator`: Taffyta 24.784 → 7.500 triángulos, Candlehead 31.008 → 8.000, Rancis 22.540 → 7.500,
+  Adorabeezle 29.648 → 7.500)
 
 ## Tipografías
 - **Luckiest Guy** — Astigmatic (licencia Apache 2.0) — títulos

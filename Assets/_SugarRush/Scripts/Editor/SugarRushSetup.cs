@@ -917,6 +917,7 @@ namespace SugarRush.EditorTools
             ("Taffyta", "taffyta_muttonfudge.glb", 7500),
             ("Candlehead", "candlehead.glb", 8000), // below this her cupcake hat breaks up
             ("Rancis", "rancis_fluggerbutter.glb", 7500),
+            ("Adorabeezle", "adorabeezle_winterpop.glb", 7500),
         };
         const string VanellopeFbx = CharactersDir + "/Vanellope/Vanellope.fbx";
         const float CharacterHeight = 1.35f;
