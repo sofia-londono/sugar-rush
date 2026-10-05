@@ -165,6 +165,14 @@ namespace SugarRush
         /// </summary>
         float ChooseLane(RaceManager manager, TrackPath path, float s, AIPersonality p)
         {
+            // Ralph's chaos: steer around rubble (or through it to repair it), and pick up coins.
+            var chaos = RalphChaos.Instance;
+            if (chaos && chaos.LaneHint(progress, s, out float hint))
+            {
+                float roadLimit = Mathf.Max(0f, path.roadHalfWidth - 1f);
+                return Mathf.Clamp(hint, -roadLimit, roadLimit);
+            }
+
             float lane = Mathf.Clamp(laneOffset, -p.laneWidth, p.laneWidth);
             lane += (Mathf.PerlinNoise(noiseSeed + 7f, Time.time * 0.2f) - 0.5f) * 2f * p.laneWidth * (1f - p.consistency);
 

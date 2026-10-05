@@ -50,6 +50,7 @@ namespace SugarRush
             var netRace = raceGo.GetComponent<NetRace>();
             raceGo.GetComponent<NetworkObject>().Spawn();
             netRace.Laps.Value = GameSettings.Laps;
+            netRace.ChaosOn.Value = GameSettings.RalphChaos;
 
             SpawnOnlineGrid();
             StartCoroutine(OnlineCountdown(netRace));

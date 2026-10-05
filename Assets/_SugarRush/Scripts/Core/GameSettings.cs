@@ -19,6 +19,8 @@ namespace SugarRush
         /// <summary>Index into QualitySettings.names (0 = Mobile/performance, 1 = PC/quality).</summary>
         public static int Quality { get; set; }
         public static int Laps { get; set; } = 3;
+        /// <summary>Ralph smashes the road during races; coins and Felix's hammer fix it.</summary>
+        public static bool RalphChaos { get; set; } = true;
         public static int SelectedKart { get; set; }
 
         public static event Action Changed;
@@ -38,6 +40,7 @@ namespace SugarRush
             // Settings saved before version 2 had "Quality" as default: switch them once.
             Quality = PlayerPrefs.GetInt("settingsVersion", 1) < 2 ? 0 : PlayerPrefs.GetInt("quality", 0);
             Laps = Mathf.Clamp(PlayerPrefs.GetInt("laps", 3), MinLaps, MaxLaps);
+            RalphChaos = PlayerPrefs.GetInt("ralphChaos", 1) != 0;
             SelectedKart = PlayerPrefs.GetInt("kart", 0);
             Apply();
         }
@@ -51,6 +54,7 @@ namespace SugarRush
             PlayerPrefs.SetInt("quality", Quality);
             PlayerPrefs.SetInt("settingsVersion", 2);
             PlayerPrefs.SetInt("laps", Laps);
+            PlayerPrefs.SetInt("ralphChaos", RalphChaos ? 1 : 0);
             PlayerPrefs.SetInt("kart", SelectedKart);
             PlayerPrefs.Save();
             Apply();

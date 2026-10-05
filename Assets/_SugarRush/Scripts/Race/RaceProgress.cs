@@ -38,6 +38,8 @@ namespace SugarRush
         public bool Finished { get; set; }
         public float FinishTime { get; set; }
         public float BestLap { get; private set; }
+        /// <summary>Ralph's chaos, offline: gold coins carried (online the count lives in NetKart.Coins).</summary>
+        public int Coins { get; set; }
         public float LastLap { get; private set; }
         public bool WrongWay { get; private set; }
         public bool OffTrack { get; private set; }

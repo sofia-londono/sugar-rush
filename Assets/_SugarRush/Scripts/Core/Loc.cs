@@ -17,8 +17,8 @@ namespace SugarRush
             ["menu.quit"] = ("Salir", "Quit"),
             ["menu.back"] = ("Volver", "Back"),
             ["menu.select"] = ("¡Elegir!", "Pick!"),
-            ["menu.credits"] = ("Juego de fans sin fines de lucro · Modelos 3D: RazyBerry y amogusstrikesback2 (CC BY 4.0) · Fuentes: Luckiest Guy (Apache 2.0) y Fredoka (OFL)",
-                                "Non-profit fan game · 3D models: RazyBerry & amogusstrikesback2 (CC BY 4.0) · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
+            ["menu.credits"] = ("Juego de fans sin fines de lucro · Modelos 3D: RazyBerry, amogusstrikesback2 y danigamer495channel (CC BY 4.0) · Fuentes: Luckiest Guy (Apache 2.0) y Fredoka (OFL)",
+                                "Non-profit fan game · 3D models: RazyBerry, amogusstrikesback2 & danigamer495channel (CC BY 4.0) · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
             ["menu.best"] = ("Récord ({0} vueltas): {1}", "Best ({0} laps): {1}"),
 
             // Online
@@ -91,6 +91,14 @@ namespace SugarRush
             ["opt.quality.0"] = ("Rendimiento", "Performance"),
             ["opt.quality.1"] = ("Calidad", "Quality"),
             ["opt.laps"] = ("Vueltas", "Laps"),
+            ["opt.chaos"] = ("Caos de Ralph", "Ralph's chaos"),
+            ["opt.on"] = ("Activado", "On"),
+            ["opt.off"] = ("Desactivado", "Off"),
+
+            // Ralph's chaos
+            ["chaos.incoming"] = ("¡Ralph viene!", "Ralph is coming!"),
+            ["chaos.hammer"] = ("¡Martillo listo!", "Hammer ready!"),
+            ["chaos.fixed"] = ("¡Yo lo arreglo!", "I can fix it!"),
 
             // HUD
             ["hud.lap"] = ("Vuelta {0}/{1}", "Lap {0}/{1}"),

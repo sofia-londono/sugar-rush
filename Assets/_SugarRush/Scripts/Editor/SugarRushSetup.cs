@@ -38,6 +38,8 @@ namespace SugarRush.EditorTools
         const string PanelSettingsPath = UIDir + "/PanelSettings.asset";
         const string RaceScenePath = Root + "/Scenes/" + SceneNames.Race + ".unity";
         const string MenuScenePath = Root + "/Scenes/" + SceneNames.MainMenu + ".unity";
+        const string CharactersDir = Root + "/Art/Characters";
+        const string RalphPrefabPath = CharactersDir + "/Ralph/Ralph.prefab";
 
         public const float TrackScale = 40f;
         const string RoadColliderMesh = "raod_tgsd_001";
@@ -96,6 +98,7 @@ namespace SugarRush.EditorTools
             log.AppendLine(SetupAudio());
             log.AppendLine(SetupTrackImport());
             log.AppendLine(SetupUIAssets());
+            log.AppendLine(SetupCharacters());
             log.AppendLine(BuildRaceScene());
             log.AppendLine(BuildMenuScene());
             log.AppendLine(SetupBuildSettings());
@@ -483,6 +486,10 @@ namespace SugarRush.EditorTools
             lib.countdownGo = Clip("SFX/countdown_go.wav");
             lib.lapChime = Clip("SFX/lap_chime.wav");
             lib.finishFanfare = Clip("SFX/finish_fanfare.wav");
+            lib.coin = Clip("SFX/coin.wav");
+            lib.ralphWarning = Clip("SFX/ralph_warning.wav");
+            lib.ralphSmash = Clip("SFX/ralph_smash.wav");
+            lib.hammerFix = Clip("SFX/hammer_fix.wav");
             lib.uiMove = Clip("SFX/ui_move.ogg");
             lib.uiClick = Clip("SFX/ui_click.ogg");
             lib.uiBack = Clip("SFX/ui_back.ogg");
@@ -558,6 +565,7 @@ namespace SugarRush.EditorTools
             var path = BuildTrackPath(track);
             string wallInfo = BuildWalls(WeldedMesh.From(road), path);
             BuildFinishLine(path);
+            string chaosInfo = BuildChaos(path);
 
             var cam = AddCamera(3000f);
             var kartCamera = cam.gameObject.AddComponent<KartCamera>();
@@ -579,7 +587,7 @@ namespace SugarRush.EditorTools
 
             EnsureFolder(Path.GetDirectoryName(RaceScenePath).Replace('\\', '/'));
             EditorSceneManager.SaveScene(scene, RaceScenePath);
-            return $"Race scene: path={path.Count} pts / {path.Length:0} m | colliders={colliders} | {wallInfo}";
+            return $"Race scene: path={path.Count} pts / {path.Length:0} m | colliders={colliders} | {wallInfo} | {chaosInfo}";
         }
 
         static TrackPath BuildTrackPath(GameObject track)
@@ -809,6 +817,214 @@ namespace SugarRush.EditorTools
             walls.AddComponent<MeshCollider>().sharedMesh = mesh;
             GameObjectUtility.SetStaticEditorFlags(walls, StaticEditorFlags.BatchingStatic);
             return $"walls={tris.Count / 6} seamsSkipped={skipped} crossingsSkipped={crossings}";
+        }
+
+        // ---------------------------------------------------------------- Ralph's chaos
+
+        /// <summary>Path segments of the stretches Ralph smashes: straight, flat and wide enough for a detour.</summary>
+        static readonly int[] ChaosZoneSegments = { 13, 103, 126 };
+        /// <summary>
+        /// Pairs of coins: path segment and sideways offset (clamped to the road). Off the racing
+        /// line on purpose, so collecting five is a choice and not an accident.
+        /// </summary>
+        static readonly (int seg, float lateral)[] CoinRows =
+        {
+            (6, -2.8f), (32, 2.8f), (46, -2.8f), (64, 2.8f), (82, -2.8f), (110, 2.8f), (140, -2.8f), (152, 2.8f),
+        };
+        const float ChaosZoneHalfLength = 7f;
+
+        [MenuItem("Sugar Rush/Characters (GLB)")]
+        public static string SetupCharacters()
+        {
+            if (File.Exists(RalphPrefabPath)) return "Characters: Ralph prefab already imported";
+            string glb = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "Downloads", "ralph_el_demoledor.glb");
+            if (!File.Exists(glb)) return "Characters: ralph_el_demoledor.glb not found in Downloads (chaos works without Ralph's model)";
+            var r = GlbImport.Import(glb, CharactersDir + "/Ralph", "Ralph", 6f);
+            return $"Characters: Ralph {r.Triangles} tris, {r.Bones} bones, size {r.Size}";
+        }
+
+        /// <summary>Drivable road to the left and right of a point on the racing line (metres).</summary>
+        static (float left, float right) RoadExtents(TrackPath path, float distance)
+        {
+            Vector3 p = path.PositionAtDistance(distance);
+            Vector3 right = Vector3.Cross(Vector3.up, Vector3.ProjectOnPlane(path.DirectionAtDistance(distance), Vector3.up)).normalized;
+            var ext = new float[2];
+            for (int side = 0; side < 2; side++)
+            {
+                float sign = side == 0 ? -1f : 1f;
+                for (float o = 0.5f; o <= 12f; o += 0.5f)
+                {
+                    Vector3 q = p + right * sign * o;
+                    if (!Physics.Raycast(q + Vector3.up * 3f, Vector3.down, out var hit, 6f) || hit.collider.name == "TrackWalls"
+                        || Mathf.Abs(hit.point.y - p.y) > 0.7f || hit.normal.y < 0.85f) break;
+                    if (Physics.Raycast(p + Vector3.up * 0.8f, right * sign, o)) break;
+                    ext[side] = o;
+                }
+            }
+            return (ext[0], ext[1]);
+        }
+
+        static RaycastHit GroundHit(Vector3 p)
+        {
+            Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out var hit, 8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            if (!hit.collider) hit.point = p;
+            if (hit.normal == Vector3.zero) hit.normal = Vector3.up;
+            return hit;
+        }
+
+        static string BuildChaos(TrackPath path)
+        {
+            var root = new GameObject("RalphChaos");
+            var chaos = root.AddComponent<RalphChaos>();
+            chaos.path = path;
+
+            var lit = "Universal Render Pipeline/Lit";
+            var chocolate = GetMaterial("Chaos/Chocolate", lit, new Color(0.32f, 0.17f, 0.1f));
+            var crack = GetMaterial("Chaos/Crack", lit, new Color(0.13f, 0.06f, 0.04f));
+            var candies = new[]
+            {
+                GetMaterial("Chaos/CandyPink", lit, new Color(1f, 0.5f, 0.74f)),
+                GetMaterial("Chaos/CandyMint", lit, new Color(0.52f, 0.9f, 0.76f)),
+                GetMaterial("Chaos/CandyLemon", lit, new Color(1f, 0.87f, 0.42f)),
+                GetMaterial("Chaos/Cookie", lit, new Color(0.86f, 0.62f, 0.38f)),
+                chocolate,
+            };
+            var gold = GetMaterial("Chaos/Gold", lit, new Color(1f, 0.76f, 0.2f));
+            gold.SetFloat("_Metallic", 0.65f);
+            gold.SetFloat("_Smoothness", 0.75f);
+            gold.EnableKeyword("_EMISSION");
+            gold.SetColor("_EmissionColor", new Color(0.45f, 0.3f, 0.04f));
+            gold.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            gold.enableInstancing = true;
+            EditorUtility.SetDirty(gold);
+
+            var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            var cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
+
+            // Zones: rubble on the narrower side of the road, the wider side stays open.
+            var zones = new List<ChaosZone>();
+            for (int zi = 0; zi < ChaosZoneSegments.Length; zi++)
+            {
+                float d = path.DistanceAt(ChaosZoneSegments[zi]);
+                float left = float.MaxValue, right = float.MaxValue;
+                foreach (float off in new[] { -ChaosZoneHalfLength + 1f, 0f, ChaosZoneHalfLength - 1f })
+                {
+                    var (l, r) = RoadExtents(path, d + off);
+                    left = Mathf.Min(left, l);
+                    right = Mathf.Min(right, r);
+                }
+                bool blockRight = right <= left;
+                float narrow = Mathf.Min(blockRight ? right : left, 5.5f);
+                var zone = new ChaosZone
+                {
+                    distance = d,
+                    halfLength = ChaosZoneHalfLength,
+                    blockedMin = blockRight ? -1f : -narrow,
+                    blockedMax = blockRight ? narrow : 1f,
+                    roadMin = -left,
+                    roadMax = right,
+                };
+
+                Vector3 rightVec = Vector3.Cross(Vector3.up, Vector3.ProjectOnPlane(path.DirectionAtDistance(d), Vector3.up)).normalized;
+                float mid = (zone.blockedMin + zone.blockedMax) * 0.5f;
+                var hit = GroundHit(path.PositionAtDistance(d) + rightVec * mid);
+                var rubbleGo = new GameObject($"Rubble_{zi}");
+                rubbleGo.transform.SetParent(root.transform, false);
+                rubbleGo.transform.SetPositionAndRotation(hit.point,
+                    Quaternion.LookRotation(Vector3.ProjectOnPlane(path.DirectionAtDistance(d), hit.normal).normalized, hit.normal));
+                BuildRubbleMesh(rubbleGo, zi, zone.blockedMax - zone.blockedMin, ChaosZoneHalfLength * 2f - 1f, cube, cylinder, chocolate, crack, candies);
+                zone.rubble = rubbleGo.transform;
+                zone.ralphSpot = hit.point;
+                zone.ralphSide = rightVec * (blockRight ? 1f : -1f);
+                zones.Add(zone);
+            }
+            chaos.zones = zones.ToArray();
+
+            // Coins: pairs along the road, beside the racing line.
+            var coinList = new List<Transform>();
+            foreach (var (seg, lateral) in CoinRows)
+                for (int k = 0; k < 2; k++)
+                {
+                    float d = path.DistanceAt(seg) + k * 3.5f;
+                    var (l, r) = RoadExtents(path, d);
+                    float lat = Mathf.Clamp(lateral, -Mathf.Max(0f, l - 1f), Mathf.Max(0f, r - 1f));
+                    Vector3 rightVec = Vector3.Cross(Vector3.up, Vector3.ProjectOnPlane(path.DirectionAtDistance(d), Vector3.up)).normalized;
+                    var hit = GroundHit(path.PositionAtDistance(d) + rightVec * lat);
+                    var coin = new GameObject($"Coin_{coinList.Count:00}");
+                    coin.transform.SetParent(root.transform, false);
+                    coin.transform.position = hit.point + Vector3.up * 1f;
+                    coin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stand the disc up
+                    coin.transform.localScale = new Vector3(0.9f, 0.05f, 0.9f);
+                    coin.AddComponent<MeshFilter>().sharedMesh = cylinder;
+                    var mr = coin.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = gold;
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    coinList.Add(coin.transform);
+                }
+            chaos.coins = coinList.ToArray();
+
+            // Ralph: one model, hidden until he jumps in.
+            var ralphPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(RalphPrefabPath);
+            if (ralphPrefab)
+            {
+                var ralph = (GameObject)PrefabUtility.InstantiatePrefab(ralphPrefab);
+                ralph.transform.SetParent(root.transform, false);
+                chaos.ralph = ralph.AddComponent<RalphPuppet>();
+                chaos.ralph.model = ralph.transform.GetChild(0);
+                ralph.SetActive(false);
+            }
+            return $"chaos: {zones.Count} zones, {coinList.Count} coins, ralph={(ralphPrefab ? "yes" : "missing")}";
+        }
+
+        /// <summary>
+        /// Smashed road, built once and combined into a single mesh: chocolate craters, cracks
+        /// and chunks of candy over a <paramref name="width"/> x <paramref name="length"/> patch.
+        /// </summary>
+        static void BuildRubbleMesh(GameObject go, int seed, float width, float length, Mesh cube, Mesh cylinder,
+            Material chocolate, Material crack, Material[] candies)
+        {
+            var rng = new System.Random(1234 + seed * 77);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            var groups = new Dictionary<Material, List<CombineInstance>>();
+            void Piece(Mesh mesh, Material mat, Vector3 pos, Quaternion rot, Vector3 scale)
+            {
+                if (!groups.TryGetValue(mat, out var list)) groups[mat] = list = new List<CombineInstance>();
+                list.Add(new CombineInstance { mesh = mesh, transform = Matrix4x4.TRS(pos, rot, scale) });
+            }
+
+            float hw = width * 0.5f, hl = length * 0.5f;
+            for (int i = 0; i < 3; i++)
+                Piece(cylinder, chocolate, new Vector3(R(-hw, hw) * 0.25f, 0.03f, -hl * 0.6f + i * hl * 0.6f),
+                    Quaternion.Euler(0f, R(0f, 180f), 0f), new Vector3(width * R(0.55f, 0.75f), 0.03f, R(3f, 4.2f)));
+            for (int i = 0; i < 7; i++)
+                Piece(cube, crack, new Vector3(R(-hw, hw) * 0.8f, 0.07f, R(-hl, hl) * 0.85f),
+                    Quaternion.Euler(0f, R(0f, 180f), 0f), new Vector3(0.18f, 0.04f, R(2f, 4f)));
+            for (int i = 0; i < 14; i++)
+            {
+                float size = R(0.5f, 1.15f);
+                Piece(cube, candies[rng.Next(candies.Length)], new Vector3(R(-hw, hw) * 0.85f, size * 0.22f, R(-hl, hl) * 0.9f),
+                    Quaternion.Euler(R(-30f, 30f), R(0f, 360f), R(-30f, 30f)), new Vector3(size, size * R(0.6f, 1f), size * R(0.7f, 1.2f)));
+            }
+
+            var parts = new List<CombineInstance>();
+            var mats = new List<Material>();
+            foreach (var (mat, list) in groups)
+            {
+                var part = new Mesh();
+                part.CombineMeshes(list.ToArray(), true, true);
+                parts.Add(new CombineInstance { mesh = part, transform = Matrix4x4.identity });
+                mats.Add(mat);
+            }
+            var mesh = new Mesh { name = $"Rubble_{seed}" };
+            mesh.CombineMeshes(parts.ToArray(), false, false);
+            foreach (var p in parts) Object.DestroyImmediate(p.mesh);
+            mesh.RecalculateBounds();
+            string meshPath = $"{GeneratedDir}/Rubble_{seed}.asset";
+            EnsureFolder(GeneratedDir);
+            AssetDatabase.DeleteAsset(meshPath);
+            AssetDatabase.CreateAsset(mesh, meshPath);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
         }
 
         // ---------------------------------------------------------------- Main menu scene

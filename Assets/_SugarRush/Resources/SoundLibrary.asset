@@ -25,6 +25,10 @@ MonoBehaviour:
   countdownGo: {fileID: 8300000, guid: 02ed63c64169b1f4dbe787b1ff825a8d, type: 3}
   lapChime: {fileID: 8300000, guid: 9cb1c3c81b27f7247a08050a9146a2a3, type: 3}
   finishFanfare: {fileID: 8300000, guid: 3d002c87f286c18439510908e5f31546, type: 3}
+  coin: {fileID: 8300000, guid: c2deae23841ae5f4f8123dca7332e253, type: 3}
+  ralphWarning: {fileID: 8300000, guid: 4163f146d2cca96438de16636faf85a5, type: 3}
+  ralphSmash: {fileID: 8300000, guid: f309f0de4445285428ab0db5b43094ac, type: 3}
+  hammerFix: {fileID: 8300000, guid: 9fbaafaf984d33c4e983ca4c09736894, type: 3}
   uiMove: {fileID: 8300000, guid: bbfb882e5de5d2149a286029f4d2f10a, type: 3}
   uiClick: {fileID: 8300000, guid: 0157b912b0ec5634ca3f6515cb908421, type: 3}
   uiBack: {fileID: 8300000, guid: 98d2f92fd16eaf945a60532cdb18f681, type: 3}

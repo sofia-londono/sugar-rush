@@ -25,6 +25,12 @@ namespace SugarRush
         public AudioClip lapChime;
         public AudioClip finishFanfare;
 
+        [Header("Ralph's chaos")]
+        public AudioClip coin;
+        public AudioClip ralphWarning;
+        public AudioClip ralphSmash;
+        public AudioClip hammerFix;
+
         [Header("Menus")]
         public AudioClip uiMove;
         public AudioClip uiClick;

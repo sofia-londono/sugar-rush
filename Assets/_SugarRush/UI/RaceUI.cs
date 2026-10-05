@@ -18,8 +18,9 @@ namespace SugarRush
         {
             public RaceProgress Player;
             public VisualElement Root, Lost;
-            public CandyTitle Position, Total, Speed, Boost, Message, Tag;
-            public Label Lap, Time, LostText;
+            public CandyTitle Position, Total, Speed, Boost, Message, Tag, Hammer;
+            public Label Lap, Time, LostText, Coins;
+            public VisualElement CoinRow;
             public float MessageUntil;
             public bool FinalLapAnnounced;
 
@@ -33,8 +34,10 @@ namespace SugarRush
         }
 
         RaceManager race;
-        VisualElement root, overlay, sharedCenter;
-        CandyTitle countdown;
+        RalphChaos chaos;
+        VisualElement root, overlay, sharedCenter, bannerBox;
+        CandyTitle countdown, banner;
+        float bannerUntil;
         Label pauseHint;
         readonly List<PlayerHud> huds = new();
         VisualElement resultsRows;
@@ -53,6 +56,13 @@ namespace SugarRush
             race.StateChanged += OnStateChanged;
             race.RacerLapCompleted += OnLapCompleted;
             race.LocalPlayerFinished += OnLocalPlayerFinished;
+            chaos = RalphChaos.Instance;
+            if (chaos)
+            {
+                chaos.RalphIncoming += OnRalphIncoming;
+                chaos.Repaired += OnRepaired;
+                chaos.CoinCollected += OnCoinCollected;
+            }
             UIKit.FadeIn(root);
             if (Lib) AudioHub.PlayMusic(Lib.raceMusic);
         }
@@ -63,6 +73,12 @@ namespace SugarRush
             race.StateChanged -= OnStateChanged;
             race.RacerLapCompleted -= OnLapCompleted;
             race.LocalPlayerFinished -= OnLocalPlayerFinished;
+            if (chaos)
+            {
+                chaos.RalphIncoming -= OnRalphIncoming;
+                chaos.Repaired -= OnRepaired;
+                chaos.CoinCollected -= OnCoinCollected;
+            }
         }
 
         // ------------------------------------------------------------ HUD
@@ -74,6 +90,12 @@ namespace SugarRush
             countdown = UIKit.Title("", CandyTone.Rainbow, "candy-title--xxl");
             sharedCenter.Add(countdown);
             root.Add(sharedCenter);
+
+            bannerBox = UIKit.Div("hud-banner", "hidden");
+            bannerBox.pickingMode = PickingMode.Ignore;
+            banner = UIKit.Title(Loc.T("chaos.incoming"), CandyTone.Lemon, "candy-title--xl");
+            bannerBox.Add(banner);
+            root.Add(bannerBox);
 
             var hint = UIKit.Div("hud-corner", "hud-corner--bottom-left");
             hint.pickingMode = PickingMode.Ignore;
@@ -126,6 +148,15 @@ namespace SugarRush
             posRow.Add(h.Position);
             posRow.Add(h.Total);
             topLeft.Add(posRow);
+
+            // Ralph's chaos: coins carried, and Felix's hammer once there are enough.
+            h.CoinRow = UIKit.Div("hud-row", "coin-row");
+            h.CoinRow.Add(UIKit.Div("coin-icon"));
+            h.Coins = UIKit.Chip(h.CoinRow, "0/5", "candy-chip--coins");
+            h.Hammer = UIKit.Title(Loc.T("chaos.hammer"), CandyTone.Lemon, "candy-title--sm");
+            h.Hammer.AddToClassList("coin-row__hammer");
+            h.CoinRow.Add(h.Hammer);
+            topLeft.Add(h.CoinRow);
             h.Root.Add(topLeft);
 
             var topRight = UIKit.Div("hud-corner", "hud-corner--top-right");
@@ -175,6 +206,7 @@ namespace SugarRush
 
             foreach (var h in huds) RefreshHud(h);
             pauseHint.EnableInClassList("hidden", resultsShown);
+            RefreshBanner();
 
             if (resultsShown)
             {
@@ -205,6 +237,18 @@ namespace SugarRush
             h.Speed.Text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
             h.Boost.EnableInClassList("hidden", !player.Kart.IsBoosting);
 
+            bool chaosOn = chaos && chaos.Active;
+            h.CoinRow.EnableInClassList("hidden", !chaosOn);
+            if (chaosOn)
+            {
+                int coins = chaos.CoinsOf(player);
+                h.Coins.text = $"{coins}/{chaos.hammerCost}";
+                bool hammer = coins >= chaos.hammerCost;
+                h.Hammer.EnableInClassList("hidden", !hammer);
+                // Gentle pulse so a ready hammer is noticed.
+                if (hammer) h.Hammer.style.scale = new Scale(Vector3.one * (1f + 0.06f * Mathf.Sin(Time.unscaledTime * 6f)));
+            }
+
             // Priority: wrong way warning, then timed messages.
             bool wrongWay = player.WrongWay && !player.Finished;
             if (wrongWay)
@@ -221,6 +265,34 @@ namespace SugarRush
         }
 
         PlayerHud HudOf(RaceProgress racer) => huds.Find(h => h.Player == racer);
+
+        // ------------------------------------------------------------ Ralph's chaos
+
+        void OnRalphIncoming(int zone)
+        {
+            bannerUntil = Time.unscaledTime + (chaos ? chaos.warningTime : 2.5f) + 0.8f;
+            banner.Text = Loc.T("chaos.incoming");
+            bannerBox.RemoveFromClassList("hidden");
+            UIKit.Pop(banner);
+        }
+
+        void RefreshBanner()
+        {
+            bool show = Time.unscaledTime < bannerUntil && !resultsShown;
+            bannerBox.EnableInClassList("hidden", !show);
+            if (!show) return;
+            // Shaky letters, like the ground under Ralph's feet.
+            float t = Time.unscaledTime * 30f;
+            banner.style.translate = new Translate((Mathf.PerlinNoise(t, 0f) - 0.5f) * 16f, (Mathf.PerlinNoise(0f, t) - 0.5f) * 12f);
+        }
+
+        void OnRepaired(RaceProgress racer) => HudOf(racer)?.ShowMessage(Loc.T("chaos.fixed"), 1.6f, CandyTone.Lemon);
+
+        void OnCoinCollected(RaceProgress racer)
+        {
+            var h = HudOf(racer);
+            if (h != null) UIKit.Pop(h.CoinRow);
+        }
 
         void OnStateChanged(RaceManager.State state)
         {

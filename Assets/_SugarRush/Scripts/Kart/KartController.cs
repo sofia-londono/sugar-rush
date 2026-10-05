@@ -77,6 +77,7 @@ namespace SugarRush
         Vector3 groundNormal = Vector3.up;
         float driftTime;
         float boostTimer;
+        float roughTimer;
         int groundedWheels;
         const int SafePointHistory = 6;
         readonly System.Collections.Generic.Queue<(Vector3, Quaternion)> safePoints = new();
@@ -119,11 +120,14 @@ namespace SugarRush
 
             UpdateDrift(dt);
             if (boostTimer > 0f) boostTimer -= dt;
+            if (roughTimer > 0f) roughTimer -= dt;
 
             if (IsGrounded)
             {
                 // Engine / brake
                 float topSpeed = maxSpeed + (IsBoosting ? boostSpeed : 0f);
+                bool rough = roughTimer > 0f;
+                if (rough) topSpeed = Mathf.Min(topSpeed, maxSpeed * RoughSpeedFactor);
                 float accel = 0f;
                 if (IsBoosting)
                     accel = ForwardSpeed < topSpeed ? boostAcceleration : 0f;
@@ -140,7 +144,9 @@ namespace SugarRush
 
                 // Over-speed bleed (e.g. after a boost ends)
                 if (ForwardSpeed > topSpeed)
-                    rb.AddForce(-forward * (ForwardSpeed - topSpeed) * 2f, ForceMode.Acceleration);
+                    rb.AddForce(-forward * (ForwardSpeed - topSpeed) * (rough ? 3.5f : 2f), ForceMode.Acceleration);
+                // Rubble underneath: the kart shakes and wanders a little.
+                if (rough) rb.AddTorque(up * Random.Range(-1f, 1f) * 1.5f, ForceMode.Acceleration);
 
                 // Lateral grip
                 float g = IsDrifting ? driftGrip : grip;
@@ -272,6 +278,13 @@ namespace SugarRush
         }
 
         public void Boost(float duration) => boostTimer = Mathf.Max(boostTimer, duration);
+
+        /// <summary>Fraction of the top speed left while driving over rubble.</summary>
+        public const float RoughSpeedFactor = 0.42f;
+        public bool OnRoughGround => roughTimer > 0f;
+
+        /// <summary>Over rubble for the next moment (call every frame while on it).</summary>
+        public void SetRough(float duration = 0.15f) => roughTimer = Mathf.Max(roughTimer, duration);
 
         void TrackSafePosition(float dt)
         {

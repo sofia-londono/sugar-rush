@@ -106,4 +106,42 @@ for f in [523, 659, 784, 1047]:
     b = bell(f, 1.4, 2.2)
     fan[chord_start:chord_start + len(b)] += b * 0.6
 save("finish_fanfare", fan, 0.8)
+
+# ---- Ralph's chaos (appended last so the sounds above keep their random seed) ----
+
+# Coin: quick two-note "ding-ding".
+coin = np.zeros(int(SR * 0.4))
+for i, f in enumerate([1976, 2637]):
+    b = bell(f, 0.3, 9.0)
+    s = int(i * 0.06 * SR)
+    coin[s:s + len(b)] += b * (0.8 if i == 0 else 1.0)
+save("coin", coin, 0.7)
+
+# Ralph is coming: low rumble swelling up, with three heavy footsteps.
+tt = t(2.4)
+n = len(tt)
+rumble = lowpass(rng.normal(size=n), 160) * (0.3 + 0.7 * tt / tt[-1])
+for k, at in enumerate([0.35, 1.0, 1.6]):
+    st = int(at * SR)
+    ft = t(0.45)
+    thump = np.sin(2 * np.pi * np.cumsum(np.linspace(85, 38, len(ft))) / SR) * np.exp(-7 * ft)
+    rumble[st:st + len(ft)] += thump * (0.9 + 0.3 * k)
+save("ralph_warning", rumble * env(n, 0.1, 0.3), 0.85)
+
+# Smash: deep boom plus crunching candy.
+tt = t(1.1)
+n = len(tt)
+boom = np.sin(2 * np.pi * np.cumsum(np.linspace(95, 32, n)) / SR) * np.exp(-3.2 * tt)
+crunch = bandpass(rng.normal(size=n), 350, 2600) * np.exp(-6 * tt)
+crackle = (rng.random(n) < 0.004) * rng.normal(size=n) * 4 * np.exp(-3 * tt)
+save("ralph_smash", np.tanh((boom * 1.4 + crunch * 0.7 + lowpass(crackle, 5000)) * 1.5), 0.9)
+
+# Felix's golden hammer: "ting-ting" and a sparkly arpeggio.
+fix = np.zeros(int(SR * 1.0))
+for i, f in enumerate([2093, 2093, 1568, 2093, 2637, 3136]):
+    b = bell(f, 0.45, 7.0)
+    s = int((i * 0.07 + (0.05 if i > 1 else 0)) * SR)
+    fix[s:s + len(b)] += b * (0.9 if i < 2 else 0.6)
+save("hammer_fix", fix, 0.75)
+
 print("ok", sorted(os.listdir(OUT)))

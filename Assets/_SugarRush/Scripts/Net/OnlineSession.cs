@@ -25,7 +25,7 @@ namespace SugarRush
         /// Quick join only matches rooms made by a compatible build. Bump it whenever the
         /// network messages change, so old tabs / copies don't land in new rooms.
         /// </summary>
-        const string ProtocolVersion = "sr1";
+        const string ProtocolVersion = "sr2";
         const string VersionProperty = "v";
 
         public static ISession Session { get; private set; }

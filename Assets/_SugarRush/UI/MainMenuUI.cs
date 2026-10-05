@@ -645,6 +645,12 @@ namespace SugarRush
                 GameSettings.Save();
             }));
 
+            panel.Add(OptionRow("opt.chaos", () => Loc.T(GameSettings.RalphChaos ? "opt.on" : "opt.off"), dir =>
+            {
+                GameSettings.RalphChaos = !GameSettings.RalphChaos;
+                GameSettings.Save();
+            }));
+
             panel.Add(OptionRow("opt.laps", () => GameSettings.Laps.ToString(), dir =>
             {
                 GameSettings.Laps = Mathf.Clamp(GameSettings.Laps + dir, GameSettings.MinLaps, GameSettings.MaxLaps);

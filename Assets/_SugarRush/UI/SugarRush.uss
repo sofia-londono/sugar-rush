@@ -909,3 +909,39 @@
     margin-top: 2px;
     margin-bottom: 14px;
 }
+
+/* ---- Ralph's chaos ---- */
+.hud-banner {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 9%;
+    align-items: center;
+}
+
+.coin-row {
+    align-items: center;
+    margin-top: 6px;
+}
+
+.coin-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: #FFC83D;
+    border-width: 5px;
+    border-color: #FFF1A8;
+    margin-right: 8px;
+}
+
+.candy-chip--coins {
+    background-color: #FFF0B3;
+}
+
+.candy-chip--coins > .candy-chip__label {
+    color: #A86F00;
+}
+
+.coin-row__hammer {
+    margin-left: 12px;
+}

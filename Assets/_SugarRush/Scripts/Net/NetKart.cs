@@ -38,6 +38,8 @@ namespace SugarRush
         public readonly NetworkVariable<bool> Human = new();
         public readonly NetworkVariable<ulong> HumanClientId = new();
         public readonly NetworkVariable<int> PlayerNumber = new();
+        /// <summary>Ralph's chaos: gold coins carried, counted by the host.</summary>
+        public readonly NetworkVariable<int> Coins = new();
 
         public KartController Kart { get; private set; }
         public RaceProgress Progress { get; set; }

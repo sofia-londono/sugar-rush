@@ -112,6 +112,10 @@ namespace SugarRush
             ai.difficulty = new AIDifficulty.Level();
             while (player && !player.Finished) yield return new WaitForSeconds(5f);
             if (player) Debug.Log($"[SR] finished {player.racerName} pos={player.Position} time={player.FinishTime:0.0}");
+            var chaos = RalphChaos.Instance;
+            if (chaos)
+                Debug.Log($"[SR] chaos active={chaos.Active} events={chaos.EventCount} repairs={chaos.RepairCount} brokenSec={chaos.BrokenSeconds:0} " +
+                          $"broken={chaos.IsBroken(0)},{chaos.IsBroken(1)},{chaos.IsBroken(2)} myCoins={(player ? chaos.CoinsOf(player) : -1)}");
         }
 
         /// <summary>Logs average FPS and the slowest frames every 10 s for 60 s of racing.</summary>

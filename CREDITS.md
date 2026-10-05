@@ -7,6 +7,9 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
   https://sketchfab.com/3d-models/sugar-rush-karts-storybook-05cffff8f28b4d18965b5b7e0e3b05f3
 - **Map_tgsd** — amogusstrikesback2
   https://sketchfab.com/3d-models/map-tgsd-6cf96205665d48b681aab3b129aa9a79
+- **Ralph El Demoledor** — danigamer495channel (https://sketchfab.com/danigamer495channel)
+  https://sketchfab.com/3d-models/ralph-el-demoledor-08338217221848249fe65d0dad6c17f1
+  (importado del GLB con `GlbImport`; textura del cuerpo reducida a 1024 px)
 
 ## Tipografías
 - **Luckiest Guy** — Astigmatic (licencia Apache 2.0) — títulos
@@ -25,5 +28,5 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
   https://kenney.nl/assets/impact-sounds
 - **Interface Sounds** — Kenney (www.kenney.nl), CC0 — sonidos de menú (clic, mover, atrás, confirmar)
   https://kenney.nl/assets/interface-sounds
-- Motor, derrape, turbo, cuenta regresiva, campana de vuelta y fanfarria de meta: sintetizados para este
-  proyecto con `Tools/synth_sfx.py` (código propio, CC0).
+- Motor, derrape, turbo, cuenta regresiva, campana de vuelta, fanfarria de meta, moneda, pasos y golpe de
+  Ralph y martillo de Félix: sintetizados para este proyecto con `Tools/synth_sfx.py` (código propio, CC0).
