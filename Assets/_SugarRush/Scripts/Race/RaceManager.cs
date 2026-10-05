@@ -119,6 +119,7 @@ namespace SugarRush
                 var progress = go.AddComponent<RaceProgress>();
                 progress.path = path;
                 progress.racerName = entry.displayName;
+                progress.kartIndex = order[slot];
                 int humanIndex = slot - (order.Count - humans.Count);
                 progress.isPlayer = humanIndex >= 0;
                 progress.isHuman = progress.isPlayer;

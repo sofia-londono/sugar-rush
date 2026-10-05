@@ -3,7 +3,8 @@ using UnityEngine;
 namespace SugarRush
 {
     /// <summary>
-    /// Spinning turntable in the main menu that shows one kart at a time.
+    /// Spinning turntable in the main menu that shows one kart at a time, with its driver
+    /// standing beside it (hops and waves when picked).
     /// </summary>
     public class KartShowcase : MonoBehaviour
     {
@@ -11,8 +12,11 @@ namespace SugarRush
         public Transform turntable;
         public float spinSpeed = 30f;
         public float popDuration = 0.25f;
+        [Tooltip("Where the racer stands, facing the camera.")]
+        public Transform characterSpot;
+        public Material standeeMaterial;
 
-        GameObject[] karts;
+        GameObject[] karts, characters;
         int current = -1;
         float popTime = 1f;
 
@@ -32,16 +36,33 @@ namespace SugarRush
                 go.SetActive(false);
                 karts[i] = go;
             }
+
+            characters = new GameObject[roster.karts.Length];
+            if (characterSpot)
+                for (int i = 0; i < characters.Length; i++)
+                {
+                    characters[i] = CharacterPuppet.Create(roster.karts[i], characterSpot, standeeMaterial);
+                    if (characters[i]) characters[i].SetActive(false);
+                }
         }
 
         public void Show(int index)
         {
             index = ((index % karts.Length) + karts.Length) % karts.Length;
             if (index == current) return;
-            if (current >= 0) karts[current].SetActive(false);
+            if (current >= 0)
+            {
+                karts[current].SetActive(false);
+                if (characters[current]) characters[current].SetActive(false);
+            }
             current = index;
             karts[current].SetActive(true);
             popTime = 0f;
+            if (characters[current])
+            {
+                characters[current].SetActive(true);
+                characters[current].GetComponent<CharacterPuppet>()?.Hop();
+            }
         }
 
         void Update()

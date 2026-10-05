@@ -566,6 +566,7 @@ namespace SugarRush.EditorTools
             string wallInfo = BuildWalls(WeldedMesh.From(road), path);
             BuildFinishLine(path);
             string chaosInfo = BuildChaos(path);
+            BuildPodium();
 
             var cam = AddCamera(3000f);
             var kartCamera = cam.gameObject.AddComponent<KartCamera>();
@@ -819,6 +820,83 @@ namespace SugarRush.EditorTools
             return $"walls={tris.Count / 6} seamsSkipped={skipped} crossingsSkipped={crossings}";
         }
 
+        // ---------------------------------------------------------------- Results podium
+
+        static Material GetStandeeMaterial()
+        {
+            var mat = GetMaterial("Characters/Standee", "Universal Render Pipeline/Unlit", Color.white);
+            mat.SetFloat("_AlphaClip", 1f);
+            mat.SetFloat("_Cutoff", 0.5f);
+            mat.EnableKeyword("_ALPHATEST_ON");
+            mat.SetFloat("_Cull", 0f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>A candy podium far below the track with its own (disabled) camera; see ResultsPodium.</summary>
+        static void BuildPodium()
+        {
+            var root = new GameObject("ResultsPodium");
+            root.transform.position = new Vector3(0f, -400f, 0f);
+            var podium = root.AddComponent<ResultsPodium>();
+            podium.roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            podium.standeeMaterial = GetStandeeMaterial();
+
+            var lit = "Universal Render Pipeline/Lit";
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(floor.GetComponent<Collider>());
+            floor.name = "Floor";
+            floor.transform.SetParent(root.transform, false);
+            floor.transform.localScale = new Vector3(9f, 0.05f, 9f);
+            floor.GetComponent<Renderer>().sharedMaterial = GetMaterial("UI/PodiumFloor", lit, new Color(1f, 0.82f, 0.9f));
+
+            // 1st in the middle (tallest), 2nd on the left, 3rd on the right (as seen by the camera at +Z).
+            var steps = new (float x, float height, Color color)[]
+            {
+                (0f, 1.0f, new Color(1f, 0.85f, 0.35f)),
+                (1.3f, 0.7f, new Color(0.62f, 0.9f, 0.8f)),
+                (-1.3f, 0.45f, new Color(1f, 0.6f, 0.8f)),
+            };
+            for (int i = 0; i < 3; i++)
+            {
+                var (x, h, col) = steps[i];
+                var step = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(step.GetComponent<Collider>());
+                step.name = $"Step{i + 1}";
+                step.transform.SetParent(root.transform, false);
+                step.transform.localPosition = new Vector3(x, h * 0.5f, 0f);
+                step.transform.localScale = new Vector3(1.2f, h, 1.2f);
+                step.GetComponent<Renderer>().sharedMaterial = GetMaterial($"UI/PodiumStep{i + 1}", lit, col);
+                var spot = new GameObject($"Place{i + 1}").transform;
+                spot.SetParent(root.transform, false);
+                spot.localPosition = new Vector3(x, h, 0f);
+                podium.spots[i] = spot; // characters face +Z, towards the camera
+            }
+
+            var lightGo = new GameObject("PodiumLight");
+            lightGo.transform.SetParent(root.transform, false);
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 12f;
+            light.intensity = 2.5f;
+            light.color = new Color(1f, 0.95f, 0.9f);
+            lightGo.transform.localPosition = new Vector3(0f, 4f, 3f);
+            lightGo.SetActive(true);
+
+            var camGo = new GameObject("PodiumCamera");
+            camGo.transform.SetParent(root.transform, false);
+            var cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(1f, 0.87f, 0.93f);
+            cam.fieldOfView = 32f;
+            cam.nearClipPlane = 0.1f;
+            cam.farClipPlane = 30f;
+            camGo.transform.localPosition = new Vector3(0f, 1.65f, 5.4f);
+            camGo.transform.LookAt(root.transform.position + new Vector3(0f, 1.3f, 0f));
+            podium.podiumCamera = cam;
+            camGo.SetActive(false);
+        }
+
         // ---------------------------------------------------------------- Ralph's chaos
 
         /// <summary>Path segments of the stretches Ralph smashes: straight, flat and wide enough for a detour.</summary>
@@ -833,14 +911,155 @@ namespace SugarRush.EditorTools
         };
         const float ChaosZoneHalfLength = 7f;
 
-        [MenuItem("Sugar Rush/Characters (GLB)")]
+        /// <summary>Racer characters downloaded as GLB (in ~/Downloads): roster id, file, triangle budget.</summary>
+        static readonly (string id, string file, int maxTriangles)[] GlbCharacters =
+        {
+            ("Taffyta", "taffyta_muttonfudge.glb", 7500),
+            ("Candlehead", "candlehead.glb", 8000), // below this her cupcake hat breaks up
+            ("Rancis", "rancis_fluggerbutter.glb", 7500),
+        };
+        const string VanellopeFbx = CharactersDir + "/Vanellope/Vanellope.fbx";
+        const float CharacterHeight = 1.35f;
+
+        /// <summary>
+        /// Characters for the menu, selection and podium (and Ralph for the chaos). GLB sources are
+        /// read from Downloads only when their prefab is missing; Vanellope comes as an FBX in the
+        /// project. Racers without a model (Adorabeezle) get a portrait drawn by code.
+        /// </summary>
+        [MenuItem("Sugar Rush/Characters")]
         public static string SetupCharacters()
         {
-            if (File.Exists(RalphPrefabPath)) return "Characters: Ralph prefab already imported";
-            string glb = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "Downloads", "ralph_el_demoledor.glb");
-            if (!File.Exists(glb)) return "Characters: ralph_el_demoledor.glb not found in Downloads (chaos works without Ralph's model)";
-            var r = GlbImport.Import(glb, CharactersDir + "/Ralph", "Ralph", 6f);
-            return $"Characters: Ralph {r.Triangles} tris, {r.Bones} bones, size {r.Size}";
+            var log = new System.Text.StringBuilder("Characters:");
+            string downloads = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "Downloads");
+
+            if (!File.Exists(RalphPrefabPath))
+            {
+                string glb = Path.Combine(downloads, "ralph_el_demoledor.glb");
+                if (File.Exists(glb)) { var r = GlbImport.Import(glb, CharactersDir + "/Ralph", "Ralph", 6f); log.Append($" Ralph {r.Triangles} tris;"); }
+                else log.Append(" Ralph missing (chaos works without him);");
+            }
+
+            foreach (var (id, file, maxTris) in GlbCharacters)
+            {
+                string prefab = $"{CharactersDir}/{id}/{id}.prefab";
+                if (File.Exists(prefab)) continue;
+                string glb = Path.Combine(downloads, file);
+                if (!File.Exists(glb)) { log.Append($" {id} missing;"); continue; }
+                var r = GlbImport.Import(glb, $"{CharactersDir}/{id}", id, CharacterHeight, 1024, maxTris);
+                log.Append($" {id} {r.Triangles} tris;");
+            }
+
+            string vanPrefab = CharactersDir + "/Vanellope/Vanellope.prefab";
+            if (!File.Exists(vanPrefab) && File.Exists(VanellopeFbx)) { BuildFbxCharacter(VanellopeFbx, CharactersDir + "/Vanellope/vanellope_diff.png", vanPrefab, "Vanellope"); log.Append(" Vanellope (FBX);"); }
+
+            var roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
+            foreach (var entry in roster.karts)
+            {
+                entry.character = AssetDatabase.LoadAssetAtPath<GameObject>($"{CharactersDir}/{entry.id}/{entry.id}.prefab");
+                entry.portrait = entry.character ? null : BuildPortrait(entry.id, entry.color);
+                log.Append($" {entry.id}={(entry.character ? "3D" : entry.portrait ? "portrait" : "none")}");
+            }
+            EditorUtility.SetDirty(roster);
+            AssetDatabase.SaveAssets();
+            return log.ToString();
+        }
+
+        /// <summary>An FBX character: one URP material with its texture, scaled to CharacterHeight, standing on its origin.</summary>
+        static void BuildFbxCharacter(string fbxPath, string texturePath, string prefabPath, string name)
+        {
+            var importer = (ModelImporter)AssetImporter.GetAtPath(fbxPath);
+            importer.importAnimation = false;
+            importer.materialImportMode = ModelImporterMaterialImportMode.None;
+            importer.SaveAndReimport();
+
+            var texImporter = (TextureImporter)AssetImporter.GetAtPath(texturePath);
+            texImporter.maxTextureSize = 1024;
+            texImporter.SaveAndReimport();
+            var mat = GetMaterial($"Characters/{name}", "Universal Render Pipeline/Lit", Color.white, AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath));
+            mat.SetFloat("_Smoothness", 0.15f);
+
+            var root = new GameObject(name);
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath));
+            PrefabUtility.UnpackPrefabInstance(model, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            model.name = name + "_Model";
+            model.transform.SetParent(root.transform, false);
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true))
+            {
+                r.sharedMaterial = mat;
+                if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
+            }
+
+            var bounds = new Bounds();
+            bool any = false;
+            foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                var baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                foreach (var v in baked.vertices)
+                {
+                    var w = smr.transform.TransformPoint(v);
+                    if (!any) { bounds = new Bounds(w, Vector3.zero); any = true; } else bounds.Encapsulate(w);
+                }
+                Object.DestroyImmediate(baked);
+            }
+            float scale = bounds.size.y > 1e-4f ? CharacterHeight / bounds.size.y : 1f;
+            model.transform.localScale *= scale;
+            model.transform.localPosition = new Vector3(-bounds.center.x * scale, -bounds.min.y * scale, -bounds.center.z * scale);
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Object.DestroyImmediate(root);
+        }
+
+        /// <summary>
+        /// Portrait for a racer without a 3D model, drawn by code: round badge in their colour, a
+        /// winter hat with a pompom, fringe, big eyes, rosy cheeks, a smile and snowflakes.
+        /// </summary>
+        static Texture2D BuildPortrait(string id, Color color)
+        {
+            const int size = 512;
+            Color hair = Color.Lerp(color, Color.white, 0.25f), badge = Color.Lerp(color, Color.white, 0.55f);
+            Color hat = new(1f, 0.55f, 0.75f), skin = new(1f, 0.89f, 0.8f), ink = new(0.25f, 0.18f, 0.28f), cheek = new(1f, 0.62f, 0.68f);
+            float px = 1.5f / size;
+            float Fill(float sd) => Mathf.Clamp01(0.5f - sd / px); // signed distance -> coverage
+            float Circle(Vector2 p, Vector2 c, float r) => (p - c).magnitude - r;
+            float Ellipse(Vector2 p, Vector2 c, Vector2 r) { var q = new Vector2((p.x - c.x) / r.x, (p.y - c.y) / r.y); return (q.magnitude - 1f) * Mathf.Min(r.x, r.y); }
+
+            return GetGeneratedTexture($"Portrait_{id}", size, (x, y) =>
+            {
+                var p = new Vector2((x + 0.5f) / size, (y + 0.5f) / size);
+                var c = Color.clear;
+                void Paint(Color col, float coverage) { if (coverage > 0f) c = Color.Lerp(c, new Color(col.r, col.g, col.b, 1f), coverage); }
+
+                float badgeSd = Circle(p, new Vector2(0.5f, 0.5f), 0.47f);
+                Paint(Color.white, Fill(badgeSd));
+                Paint(badge, Fill(badgeSd + 0.03f));
+                // Snowflake dots around the badge.
+                for (int k = 0; k < 10; k++)
+                {
+                    float a = k * 0.628f + 0.3f;
+                    Paint(Color.white, Fill(Circle(p, new Vector2(0.5f + Mathf.Cos(a) * 0.38f, 0.5f + Mathf.Sin(a) * 0.38f), 0.014f + (k % 3) * 0.004f)));
+                }
+                // Hair behind the face, then the face.
+                Paint(hair, Fill(Circle(p, new Vector2(0.5f, 0.47f), 0.24f)));
+                Paint(skin, Fill(Ellipse(p, new Vector2(0.5f, 0.42f), new Vector2(0.19f, 0.17f))));
+                // Fringe: a band of hair across the forehead with a scalloped lower edge.
+                float scallop = 0.5f + 0.012f * Mathf.Cos(p.x * 60f);
+                if (p.y > scallop && Circle(p, new Vector2(0.5f, 0.47f), 0.24f) < 0f) Paint(hair, Fill(scallop - p.y));
+                // Winter hat with a white band and pompom.
+                float hatSd = Mathf.Max(Circle(p, new Vector2(0.5f, 0.6f), 0.25f), 0.61f - p.y);
+                Paint(hat, Fill(hatSd));
+                Paint(Color.white, Fill(Mathf.Max(Mathf.Abs(p.y - 0.615f) - 0.03f, Mathf.Abs(p.x - 0.5f) - 0.25f)));
+                Paint(Color.white, Fill(Circle(p, new Vector2(0.5f, 0.87f), 0.05f)));
+                // Eyes with a highlight, cheeks, smile.
+                foreach (float ex in new[] { 0.43f, 0.57f })
+                {
+                    Paint(ink, Fill(Ellipse(p, new Vector2(ex, 0.43f), new Vector2(0.024f, 0.036f))));
+                    Paint(Color.white, Fill(Circle(p, new Vector2(ex + 0.008f, 0.448f), 0.009f)));
+                    Paint(cheek, 0.7f * Fill(Ellipse(p, new Vector2(ex + (ex < 0.5f ? -0.045f : 0.045f), 0.38f), new Vector2(0.03f, 0.02f))));
+                }
+                float smile = Mathf.Abs(Circle(p, new Vector2(0.5f, 0.375f), 0.04f)) - 0.006f;
+                if (p.y < 0.37f) Paint(ink, Fill(smile));
+                return c;
+            }, transparent: true);
         }
 
         /// <summary>Drivable road to the left and right of a point on the racing line (metres).</summary>
@@ -1060,15 +1279,24 @@ namespace SugarRush.EditorTools
             var showcase = showcaseRoot.AddComponent<KartShowcase>();
             showcase.roster = AssetDatabase.LoadAssetAtPath<KartRoster>(RosterPath);
             showcase.turntable = turntable;
+            showcase.standeeMaterial = GetStandeeMaterial();
 
             // Camera behind the turntable looking down the ice canyon, framed so the kart sits
-            // right of centre (the menu is on the left).
+            // right of centre (the menu is on the left) with its racer standing to its right.
             var cam = AddCamera(3000f);
             Vector3 target = spot + Vector3.up * 0.7f;
             Vector3 right = Vector3.Cross(Vector3.up, dir);
-            cam.transform.position = target - dir * 4.0f - right * 1.0f + Vector3.up * 1.0f;
-            cam.transform.LookAt(target - right * 2f);
+            cam.transform.position = target - dir * 5.2f - right * 0.2f + Vector3.up * 1.1f;
+            cam.transform.LookAt(target - right * 1.6f);
             cam.fieldOfView = 50f;
+
+            // The racer stands beside the platform, turned towards the camera.
+            var characterSpot = new GameObject("CharacterSpot").transform;
+            characterSpot.SetParent(showcaseRoot.transform, false);
+            characterSpot.position = spot - dir * 0.9f + right * 1.7f + Vector3.up * 0.16f;
+            Vector3 toCamera = Vector3.ProjectOnPlane(cam.transform.position - characterSpot.position, Vector3.up);
+            characterSpot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
+            showcase.characterSpot = characterSpot;
 
             var ui = AddUIDocument("MainMenuUI");
             var menu = ui.gameObject.AddComponent<MainMenuUI>();
@@ -1187,7 +1415,7 @@ namespace SugarRush.EditorTools
             return mat;
         }
 
-        static Texture2D GetGeneratedTexture(string name, int size, System.Func<int, int, Color> pixel)
+        static Texture2D GetGeneratedTexture(string name, int size, System.Func<int, int, Color> pixel, bool transparent = false)
         {
             EnsureFolder(GeneratedDir);
             string path = $"{GeneratedDir}/{name}.png";
@@ -1199,8 +1427,9 @@ namespace SugarRush.EditorTools
             Object.DestroyImmediate(tex);
             AssetDatabase.ImportAsset(path);
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.wrapMode = transparent ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
             importer.filterMode = FilterMode.Bilinear;
+            importer.alphaIsTransparency = transparent;
             importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }

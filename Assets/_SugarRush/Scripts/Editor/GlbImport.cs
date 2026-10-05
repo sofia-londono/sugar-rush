@@ -75,7 +75,7 @@ namespace SugarRush.EditorTools
         /// Imports a .glb into <paramref name="outDir"/> and saves a prefab named <paramref name="name"/>,
         /// scaled so the model is <paramref name="height"/> metres tall and standing on its origin.
         /// </summary>
-        public static Result Import(string glbPath, string outDir, string name, float height, int maxTextureSize = 1024)
+        public static Result Import(string glbPath, string outDir, string name, float height, int maxTextureSize = 1024, int maxTriangles = 0)
         {
             byte[] file = File.ReadAllBytes(glbPath);
             if (BitConverter.ToUInt32(file, 0) != 0x46546C67) throw new Exception("Not a .glb file: " + glbPath);
@@ -83,6 +83,14 @@ namespace SugarRush.EditorTools
             var gltf = JsonUtility.FromJson<Gltf>(Encoding.UTF8.GetString(file, 20, jsonLength));
             int binStart = 20 + jsonLength + 8;
             var ctx = new Context { Gltf = gltf, File = file, BinStart = binStart };
+            if (maxTriangles > 0)
+            {
+                int total = 0;
+                foreach (var m in gltf.meshes)
+                    foreach (var p in m.primitives)
+                        total += p.indices >= 0 ? gltf.accessors[p.indices].count / 3 : gltf.accessors[p.attributes.POSITION].count / 3;
+                ctx.Keep = Mathf.Min(1f, maxTriangles / (float)Mathf.Max(total, 1));
+            }
 
             EnsureFolder(outDir);
             EnsureFolder(outDir + "/Meshes");
@@ -167,6 +175,8 @@ namespace SugarRush.EditorTools
             public Gltf Gltf;
             public byte[] File;
             public int BinStart;
+            /// <summary>Fraction of triangles to keep (1 = no simplification).</summary>
+            public float Keep = 1f;
         }
 
         static IEnumerable<Transform> Children(Transform t) { foreach (Transform c in t) yield return c; }
@@ -284,6 +294,17 @@ namespace SugarRush.EditorTools
                 mats.Add(p.material);
             }
 
+            int triCount = 0;
+            foreach (var l in submeshes) triCount += l.Count / 3;
+            if (ctx.Keep < 0.999f)
+            {
+                var map = MeshDecimator.Simplify(positions, submeshes, Mathf.RoundToInt(triCount * ctx.Keep));
+                positions = Compact(positions, map);
+                normals = Compact(normals, map);
+                uvs = Compact(uvs, map);
+                if (skin != null) weights = Compact(weights, map);
+            }
+
             var mesh = new Mesh { indexFormat = positions.Count > 65535 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16 };
             mesh.SetVertices(positions);
             mesh.SetNormals(normals);
@@ -307,6 +328,13 @@ namespace SugarRush.EditorTools
             mesh.UploadMeshData(false);
             materialIndices = mats.ToArray();
             return mesh;
+        }
+
+        static List<T> Compact<T>(List<T> list, int[] map)
+        {
+            var result = new List<T>();
+            for (int i = 0; i < list.Count; i++) if (map[i] >= 0) result.Add(list[i]);
+            return result;
         }
 
         static BoneWeight SortedWeight(float[] joints, float[] w, int v)

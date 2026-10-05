@@ -35,6 +35,8 @@ namespace SugarRush
 
         RaceManager race;
         RalphChaos chaos;
+        ResultsPodium podium;
+        VisualElement podiumView;
         VisualElement root, overlay, sharedCenter, bannerBox;
         CandyTitle countdown, banner;
         float bannerUntil;
@@ -57,6 +59,7 @@ namespace SugarRush
             race.RacerLapCompleted += OnLapCompleted;
             race.LocalPlayerFinished += OnLocalPlayerFinished;
             chaos = RalphChaos.Instance;
+            podium = FindFirstObjectByType<ResultsPodium>(FindObjectsInactive.Include);
             if (chaos)
             {
                 chaos.RalphIncoming += OnRalphIncoming;
@@ -385,8 +388,18 @@ namespace SugarRush
 
             overlay = UIKit.Div("screen", "screen--dim");
             overlay.Add(new SprinkleRain(60));
+            var layout = UIKit.Div("results-layout");
+            overlay.Add(layout);
+            // The top three on a candy podium, filmed live by the podium's own camera.
+            if (podium)
+            {
+                podiumView = UIKit.Div("results-podium");
+                podiumView.pickingMode = PickingMode.Ignore;
+                layout.Add(podiumView);
+            }
             var panel = new FrostingPanel(CandyTone.Pink, 47);
             panel.AddToClassList("frosting-panel--wide");
+            panel.AddToClassList("results-panel");
             panel.Add(UIKit.Title(Loc.T("results.title"), CandyTone.Pink, "candy-title--md"));
 
             // One place per local player ("J1 2º  ·  J2 4º" in split screen).
@@ -423,7 +436,7 @@ namespace SugarRush
             }
             panel.Add(buttons);
 
-            overlay.Add(panel);
+            layout.Add(panel);
             UIKit.Enter(root, overlay);
             RefreshResults();
             UIKit.FocusLater(again);
@@ -439,6 +452,13 @@ namespace SugarRush
 
         void RefreshResults()
         {
+            if (podium && podiumView != null)
+            {
+                var top = new List<int>();
+                foreach (var r in race.Racers) if (top.Count < 3) top.Add(r.kartIndex);
+                var view = podium.Show(top);
+                podiumView.style.backgroundImage = Background.FromRenderTexture(view);
+            }
             resultsRows.Clear();
             foreach (var r in race.Racers)
             {

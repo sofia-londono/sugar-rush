@@ -138,6 +138,7 @@ namespace SugarRush
             var progress = go.GetComponent<RaceProgress>();
             if (!progress) progress = go.AddComponent<RaceProgress>();
             progress.path = path;
+            progress.kartIndex = net.Character.Value;
             // People keep their player tag in the results, even if the AI took over after they left.
             progress.racerName = net.Human.Value
                 ? $"{entry.displayName} ({Loc.T("lobby.short", net.PlayerNumber.Value)})"

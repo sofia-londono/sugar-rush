@@ -17,8 +17,8 @@ namespace SugarRush
             ["menu.quit"] = ("Salir", "Quit"),
             ["menu.back"] = ("Volver", "Back"),
             ["menu.select"] = ("¡Elegir!", "Pick!"),
-            ["menu.credits"] = ("Juego de fans sin fines de lucro · Modelos 3D: RazyBerry, amogusstrikesback2 y danigamer495channel (CC BY 4.0) · Fuentes: Luckiest Guy (Apache 2.0) y Fredoka (OFL)",
-                                "Non-profit fan game · 3D models: RazyBerry, amogusstrikesback2 & danigamer495channel (CC BY 4.0) · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
+            ["menu.credits"] = ("Juego de fans sin fines de lucro · Modelos 3D (CC BY 4.0): RazyBerry, amogusstrikesback2, danigamer495channel, guinavarro.al y Kit7207 · Fuentes: Luckiest Guy (Apache 2.0) y Fredoka (OFL)",
+                                "Non-profit fan game · 3D models (CC BY 4.0): RazyBerry, amogusstrikesback2, danigamer495channel, guinavarro.al & Kit7207 · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
             ["menu.best"] = ("Récord ({0} vueltas): {1}", "Best ({0} laps): {1}"),
 
             // Online

@@ -945,3 +945,20 @@
 .coin-row__hammer {
     margin-left: 12px;
 }
+
+/* ---- Results podium (stage D) ---- */
+.results-layout {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.results-podium {
+    width: 600px;
+    height: 450px;
+    margin-right: 24px;
+    border-radius: 40px;
+    border-width: 8px;
+    border-color: #FFFFFF;
+    background-color: #FFDDEB;
+}

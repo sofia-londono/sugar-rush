@@ -11,6 +11,8 @@ namespace SugarRush
     {
         public TrackPath path;
         public string racerName;
+        [Tooltip("Index in the kart roster (who this is, for the podium).")]
+        public int kartIndex;
         public bool isPlayer;
         [Tooltip("Driven by a person (this machine's player or, online, someone else's).")]
         public bool isHuman;

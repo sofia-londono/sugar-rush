@@ -22,6 +22,10 @@ namespace SugarRush
             [Range(0, 1)] public float handling;
             [Tooltip("How this character drives when the computer controls it.")]
             public AIPersonality personality;
+            [Tooltip("Standing character model for the menu, selection and podium (none = use the portrait).")]
+            public GameObject character;
+            [Tooltip("2D portrait, shown as a cut-out when there is no 3D character yet.")]
+            public Texture2D portrait;
         }
 
         public Entry[] karts;
