@@ -49,7 +49,7 @@ namespace SugarRush
             ["lobby.backToRoom"] = ("Volver a la sala", "Back to room"),
 
             // Local split screen
-            ["menu.local"] = ("Local (2 jugadores)", "Local (2 players)"),
+            ["menu.local"] = ("2 jugadores (misma pantalla)", "2 players (same screen)"),
             ["local.title"] = ("2 jugadores", "2 players"),
             ["local.join"] = ("Presiona A en tu control\no Enter en el teclado para unirte", "Press A on your gamepad\nor Enter on the keyboard to join"),
             ["local.keyboard"] = ("Teclado", "Keyboard"),

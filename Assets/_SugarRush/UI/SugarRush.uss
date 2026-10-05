@@ -413,6 +413,11 @@
     margin: 7px 0;
 }
 
+/* Long labels ("2 jugadores (misma pantalla)") stay on one line. */
+.candy-button--long > .candy-button__label {
+    font-size: 34px;
+}
+
 .candy-button--small {
     width: 380px;
     height: 84px;

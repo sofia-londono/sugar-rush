@@ -35,7 +35,7 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
   - Mapeo FBX → personaje: `Base` = Vanellope, `.001` = Taffyta, `.002` = Adorabeezle, `.003` = Rancis, `.004` = Candlehead (sacado de los nombres de Geometry dentro del FBX). Stats por kart en la tabla `Karts` del builder.
   - Pista importada a escala ×40 (`TrackScale`): carretera ~8–10 m de ancho, kart ~2 m. +Z es el frente de los karts.
   - Ruta de carrera (`TrackPath`, 164 puntos cada 4 m, ~668 m por vuelta, índice 0 = línea de meta): trazada a mano sobre una vista cenital (`Route` en el builder), ajustada al centro de `mini_map_road` (esa malla viene rota, no sirve sola) y con alturas por raycast. `RouteOverrides` fija puntos donde la malla del minimapa está corrida (48 = curva cerrada bajo el arco de chocolate).
-  - Paredes invisibles (`TrackWalls.asset`) solo en bordes con caída > 3 m, y nunca en bordes que cruzan la ruta (hay un saltito a la salida del anillo).
+  - Paredes invisibles (`TrackWalls.asset`) solo en bordes con caída > 3 m, y nunca en bordes que cruzan la ruta. En los labios de salto (`JumpLips` = puntos 74 salida del anillo y 89 bajada de la meseta) se quitan las que miran de frente o están a < 2,5 m de la línea, y en todo el circuito los trocitos < 0,5 m cerca de la línea: la malla se rompe en bordes pequeños justo ahí y frenaban a los karts. `GuideWalls` = paredes guía puestas a mano: al final del puente (seg 94), una diagonal que lleva a los karts que aterrizan abiertos hacia la rampa de arcoíris (antes chocaban de frente con un dulce o se encajaban en un hueco de 1 m). `ReturnLog` guarda `seg:motivo@x,y,z`.
   - El circuito: recta de salida → eses que suben → anillo elevado (~44 m) → rampa → meseta de ajedrez → salto de 6 m a un puente angosto → curva cerrada bajo el arco → bajada a la meta.
 - Carrera: `RaceManager` crea los 5 karts en la parrilla (el jugador sale último), cuenta 3-2-1, ordena posiciones por `RaceProgress.RaceDistance`, detecta la meta y guarda récord por número de vueltas (PlayerPrefs `best_<vueltas>`).
 - `RaceProgress` (por kart): vueltas, sentido contrario, fuera de pista (lejos o caído) y atascado (acelera sin avanzar). "Volver a la pista" = `ReturnToTrack()` al punto de la ruta actual; automático a los 6 s (fuera), 1,5 s (caído), 8 s jugador / 4 s IA (atascado). `ReturnLog` registra dónde pasa (diagnóstico).
@@ -53,17 +53,18 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
   - Fuentes: Luckiest Guy (títulos, Apache 2.0) y Fredoka SemiBold/Bold (texto/botones, OFL; instancias fijas generadas con fontTools desde la variable).
   - Los elementos Painter2D deben ignorar tamaños NaN antes del primer layout (`!(w >= 1f)`), si no la animación arranca con posiciones NaN.
   - Textos en `Loc` (español/inglés), idioma en Opciones.
-- `GameSettings` (PlayerPrefs): idioma, volumen de música y de efectos, dificultad, gráficos (nivel de calidad 0 = Mobile/rendimiento, 1 = PC/calidad; ambos activos en todas las plataformas), vueltas, kart elegido.
+- `GameSettings` (PlayerPrefs): idioma, volumen de música y de efectos, dificultad, gráficos (nivel de calidad 0 = Mobile/rendimiento, 1 = PC/calidad; ambos activos en todas las plataformas), vueltas, kart elegido. "Rendimiento" es el valor por defecto en todas partes; `settingsVersion` < 2 (guardado antes de ese cambio) lo fuerza una vez.
+- Gráficos "Rendimiento" en carreras de un jugador (también en línea): `Mobile_RPAsset` con render scale 0,85, sombras de la pista apagadas, distancia de dibujado 420 m con neblina pastel y límite de 60 FPS (`RaceManager.SetupPerformanceMode`, comparte `ApplyLowSpec` con la pantalla dividida). Medido en el portátil (copia de Windows, 1080p): Rendimiento 100–113 FPS sin límite (antes ~30–35), Calidad 26–33 FPS.
 - Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
 - Pendiente: multijugador fase 3 (WebGL + controles táctiles con aceleración automática), iluminación baked.
 
 ## Pantalla dividida local (etapa A)
-- Menú "Local (2 jugadores)" (oculto en celulares: `RaceSetup.SplitScreenAvailable`). Cada asiento se toma con A (control) o Enter (teclado); ← → elige corredor (sin repetir), A/Enter = listo, B/Esc = atrás. Al estar los dos listos arranca la carrera.
+- Menú "2 jugadores (misma pantalla)" (oculto en celulares: `RaceSetup.SplitScreenAvailable`). Cada asiento se toma con A (control) o Enter (teclado); ← → elige corredor (sin repetir), A/Enter = listo, B/Esc = atrás. Al estar los dos listos arranca la carrera.
 - `RaceSetup` (estático) guarda el modo (`Single` / `LocalSplit`) y por jugador el kart y sus dispositivos; `PlayerKartInput.devices` limita cada kart a su teclado o control (vacío = cualquiera, como en un jugador). "Jugar" vuelve a `Single`.
 - `RaceManager.LocalPlayers`: 1 normalmente, 2 en dividida (la IA llena el resto). La carrera termina para la máquina cuando todos los locales cruzan la meta; el récord solo cuenta en un jugador.
 - `RaceManager.Split.cs`: segunda cámara (sin AudioListener: se escucha desde la del J1), vistas lado a lado, FOV 74, y ahorro automático: render scale 0,7, sombras de pista apagadas (los karts sí proyectan), distancia de dibujado 320 m con neblina pastel, sombras a 35 m, límite 30 FPS sin vsync. Todo se restaura en `OnDestroy` (el asset de URP es compartido; verificar renderScale = 1 después de probar).
 - `RaceUI`: un HUD por jugador local (`PlayerHud`), cuenta regresiva compartida al centro, separador, resultados con "J1 2º · J2 4º".
-- Medir FPS reales: copia de Windows con `-sr-sp-test` / `-sr-local-test` (+ `-sr-uncapped`), loguea "[SR] fps" cada 10 s durante 60 s y se cierra.
+- Medir FPS reales: copia de Windows con `-sr-sp-test` / `-sr-local-test` (+ `-sr-uncapped`, `-sr-quality 0|1`), loguea "[SR] fps" cada 10 s durante 60 s y se cierra.
 
 ## Multijugador en línea
 - Paquetes: Netcode for GameObjects 2.13.3, Multiplayer Services 2.3.3 (API de "sessions" = Lobby + Relay), Multiplayer Play Mode 2.0.2. Proyecto UGS vinculado: `cd38f69e-af4e-4ba7-85b2-941ae4f89294` (en el dashboard se llama "My project"); Relay y Lobby activos.

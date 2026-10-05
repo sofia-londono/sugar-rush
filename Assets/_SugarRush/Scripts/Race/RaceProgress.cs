@@ -195,7 +195,7 @@ namespace SugarRush
                 if (dy < bestDy) { bestDy = dy; position = h.point; }
             }
 
-            ReturnLog.Add($"{seg}:{(OffTrack ? (fallen ? "fell" : "far") : StuckTime > 0f ? "stuck" : "manual")}");
+            ReturnLog.Add($"{seg}:{(OffTrack ? (fallen ? "fell" : "far") : StuckTime > 0f ? "stuck" : "manual")}@{Kart.transform.position.x:0},{Kart.transform.position.y:0},{Kart.transform.position.z:0}");
             Kart.Teleport(position + Vector3.up * 0.6f, Quaternion.LookRotation(Vector3.ProjectOnPlane(dir, Vector3.up), Vector3.up));
             TrackReturns++;
             OffTrackTime = 0f;

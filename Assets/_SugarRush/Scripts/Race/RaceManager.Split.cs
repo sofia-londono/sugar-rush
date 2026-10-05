@@ -8,6 +8,8 @@ namespace SugarRush
     /// Local split screen (two players on one machine): a second chase camera, side by side,
     /// plus automatic savings because the track is drawn twice — lower render scale, no track
     /// shadows, shorter draw distance hidden by pastel fog, and a 30 FPS cap.
+    /// One player on "Performance" graphics gets the same savings, milder: 85% render scale,
+    /// no track shadows, a shorter draw distance and a 60 FPS cap.
     /// Everything is restored when the race scene closes.
     /// </summary>
     public partial class RaceManager
@@ -19,15 +21,28 @@ namespace SugarRush
         public int splitFrameRate = 30;
         public Color splitFogColor = new(0.86f, 0.9f, 1f);
 
+        [Header("One player, Performance graphics")]
+        public float performanceRenderScale = 0.85f;
+        public float performanceDrawDistance = 420f;
+        [Tooltip("Steady 60 instead of 70-110 FPS: keeps a laptop cooler, so it doesn't throttle mid-race.")]
+        public int performanceFrameRate = 60;
+
         public KartCamera SecondCamera { get; private set; }
 
-        bool splitActive;
+        bool lowSpecActive;
         float savedRenderScale, savedShadowDistance;
         int savedFrameRate, savedVSync;
 
+        /// <summary>Graphics option 0 ("Rendimiento"); called for one-player races, offline or online.</summary>
+        void SetupPerformanceMode()
+        {
+            if (GameSettings.Quality != 0 || !kartCamera) return;
+            var cam = kartCamera.GetComponent<Camera>();
+            ApplyLowSpec(new[] { cam }, performanceDrawDistance, performanceRenderScale, float.MaxValue, performanceFrameRate);
+        }
+
         void SetupSplitScreen()
         {
-            splitActive = true;
             var cam1 = kartCamera.GetComponent<Camera>();
 
             var secondGo = Instantiate(kartCamera.gameObject);
@@ -41,20 +56,28 @@ namespace SugarRush
             var cam2 = secondGo.GetComponent<Camera>();
             cam1.rect = new Rect(0f, 0f, 0.5f, 1f);
             cam2.rect = new Rect(0.5f, 0f, 0.5f, 1f);
-            foreach (var cam in new[] { cam1, cam2 })
+            // Half-width views are tall: open the FOV so each player sees about as much road.
+            kartCamera.baseFov = SecondCamera.baseFov = 74f;
+
+            ApplyLowSpec(new[] { cam1, cam2 }, splitDrawDistance, splitRenderScale, splitShadowDistance, splitFrameRate);
+        }
+
+        /// <summary>Shorter draw distance hidden by fog, no track shadows, lower render scale and an optional frame cap.</summary>
+        void ApplyLowSpec(Camera[] cams, float drawDistance, float renderScale, float shadowDistance, int frameRate)
+        {
+            lowSpecActive = true;
+            foreach (var cam in cams)
             {
-                cam.farClipPlane = splitDrawDistance;
+                cam.farClipPlane = drawDistance;
                 cam.backgroundColor = splitFogColor;
                 cam.clearFlags = CameraClearFlags.SolidColor;
             }
-            // Half-width views are tall: open the FOV so each player sees about as much road.
-            kartCamera.baseFov = SecondCamera.baseFov = 74f;
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = splitFogColor;
-            RenderSettings.fogStartDistance = splitDrawDistance * 0.45f;
-            RenderSettings.fogEndDistance = splitDrawDistance * 0.95f;
+            RenderSettings.fogStartDistance = drawDistance * 0.45f;
+            RenderSettings.fogEndDistance = drawDistance * 0.95f;
 
             // Track pieces stop casting shadows (karts still do, and the road still receives them).
             var track = GameObject.Find("Track");
@@ -66,21 +89,24 @@ namespace SugarRush
             {
                 savedRenderScale = urp.renderScale;
                 savedShadowDistance = urp.shadowDistance;
-                urp.renderScale = Mathf.Min(urp.renderScale, splitRenderScale);
-                urp.shadowDistance = Mathf.Min(urp.shadowDistance, splitShadowDistance);
+                urp.renderScale = renderScale;
+                urp.shadowDistance = Mathf.Min(urp.shadowDistance, shadowDistance);
             }
 
             savedFrameRate = Application.targetFrameRate;
             savedVSync = QualitySettings.vSyncCount;
-            QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = splitFrameRate;
+            if (frameRate > 0)
+            {
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate = frameRate;
+            }
         }
 
         /// <summary>Put the global settings back (the URP asset is shared with every scene).</summary>
         void RestoreSplitScreen()
         {
-            if (!splitActive) return;
-            splitActive = false;
+            if (!lowSpecActive) return;
+            lowSpecActive = false;
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
             {
                 urp.renderScale = savedRenderScale;

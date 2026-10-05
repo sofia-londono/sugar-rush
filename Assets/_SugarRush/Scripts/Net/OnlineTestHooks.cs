@@ -12,6 +12,7 @@ namespace SugarRush
     ///   -sr-local-test   start a split-screen race (both players on autopilot) and log FPS
     ///   -sr-sp-test      start a single-player race on autopilot and log FPS
     ///   -sr-uncapped     with the tests above: no frame cap / vsync, to see the real headroom
+    ///   -sr-quality N    with the tests above: graphics option for this run (0 = Performance, 1 = Quality)
     /// </summary>
     public class OnlineTestHooks : MonoBehaviour
     {
@@ -19,6 +20,7 @@ namespace SugarRush
         static bool autopilot;
         static int wantedKart = -1;
         static bool localTest, spTest, uncapped;
+        static int quality = -1;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Init()
@@ -32,6 +34,7 @@ namespace SugarRush
                 if (args[i] == "-sr-local-test") localTest = true;
                 if (args[i] == "-sr-sp-test") spTest = true;
                 if (args[i] == "-sr-uncapped") uncapped = true;
+                if (args[i] == "-sr-quality" && i + 1 < args.Length) int.TryParse(args[i + 1], out quality);
             }
             if (localTest || spTest) autopilot = true;
             if (joinCode == null && !autopilot) return;
@@ -53,6 +56,11 @@ namespace SugarRush
             {
                 yield return new WaitForSeconds(2f);
                 GameSettings.Laps = 3;
+                if (quality >= 0)
+                {
+                    GameSettings.Quality = quality;
+                    QualitySettings.SetQualityLevel(quality, true);
+                }
                 if (localTest)
                     RaceSetup.SetLocalSplit(new[] { new RaceSetup.LocalPlayer { Kart = 0 }, new RaceSetup.LocalPlayer { Kart = 1 } });
                 else RaceSetup.SetSingle();
@@ -108,7 +116,8 @@ namespace SugarRush
                 float avg = 0f; foreach (var f in frames) avg += f; avg /= frames.Count;
                 float p95 = frames[(int)(frames.Count * 0.95f)];
                 Debug.Log($"[SR] fps block {block}: avg={1f / avg:0.0} fps ({avg * 1000f:0.0} ms)  slow5%={1f / p95:0.0} fps  " +
-                          $"mode={(RaceSetup.IsSplitScreen ? "split" : "single")} res={Screen.width}x{Screen.height} cap={Application.targetFrameRate}");
+                          $"mode={(RaceSetup.IsSplitScreen ? "split" : "single")} res={Screen.width}x{Screen.height} cap={Application.targetFrameRate} quality={GameSettings.Quality} " +
+                          $"scale={(UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset)?.renderScale:0.00}");
             }
             Application.Quit();
         }

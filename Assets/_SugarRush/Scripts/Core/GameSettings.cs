@@ -17,7 +17,7 @@ namespace SugarRush
         public static float SfxVolume { get; set; } = 0.8f;
         public static Difficulty Difficulty { get; set; } = SugarRush.Difficulty.Normal;
         /// <summary>Index into QualitySettings.names (0 = Mobile/performance, 1 = PC/quality).</summary>
-        public static int Quality { get; set; } = 1;
+        public static int Quality { get; set; }
         public static int Laps { get; set; } = 3;
         public static int SelectedKart { get; set; }
 
@@ -34,7 +34,9 @@ namespace SugarRush
             MusicVolume = PlayerPrefs.GetFloat("musicVolume", legacyVolume * 0.85f);
             SfxVolume = PlayerPrefs.GetFloat("sfxVolume", legacyVolume);
             Difficulty = (SugarRush.Difficulty)Mathf.Clamp(PlayerPrefs.GetInt("difficulty", (int)SugarRush.Difficulty.Normal), 0, 2);
-            Quality = PlayerPrefs.GetInt("quality", Application.isMobilePlatform ? 0 : QualitySettings.names.Length - 1);
+            // "Performance" is the default everywhere (laptops with integrated graphics, web).
+            // Settings saved before version 2 had "Quality" as default: switch them once.
+            Quality = PlayerPrefs.GetInt("settingsVersion", 1) < 2 ? 0 : PlayerPrefs.GetInt("quality", 0);
             Laps = Mathf.Clamp(PlayerPrefs.GetInt("laps", 3), MinLaps, MaxLaps);
             SelectedKart = PlayerPrefs.GetInt("kart", 0);
             Apply();
@@ -47,6 +49,7 @@ namespace SugarRush
             PlayerPrefs.SetFloat("sfxVolume", SfxVolume);
             PlayerPrefs.SetInt("difficulty", (int)Difficulty);
             PlayerPrefs.SetInt("quality", Quality);
+            PlayerPrefs.SetInt("settingsVersion", 2);
             PlayerPrefs.SetInt("laps", Laps);
             PlayerPrefs.SetInt("kart", SelectedKart);
             PlayerPrefs.Save();

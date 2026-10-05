@@ -100,7 +100,7 @@ namespace SugarRush
             column.Add(play);
             column.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky", "candy-button--menu"));
             if (RaceSetup.SplitScreenAvailable)
-                column.Add(UIKit.Button(Loc.T("menu.local"), () => ShowPage(Page.Local), "candy-button--pink-light", "candy-button--menu"));
+                column.Add(UIKit.Button(Loc.T("menu.local"), () => ShowPage(Page.Local), "candy-button--pink-light", "candy-button--menu", "candy-button--long"));
             column.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint", "candy-button--menu"));
             column.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender", "candy-button--menu"));
 #if !UNITY_WEBGL

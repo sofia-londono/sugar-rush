@@ -67,7 +67,7 @@ namespace SugarRush
 
         void Start()
         {
-            if (IsOnline) { StartOnline(); return; }
+            if (IsOnline) { SetupPerformanceMode(); StartOnline(); return; }
             SpawnRacers();
             StartCoroutine(CountdownRoutine());
         }
@@ -147,6 +147,7 @@ namespace SugarRush
                 kartCamera.SnapToTarget();
             }
             if (LocalPlayers.Count > 1) SetupSplitScreen();
+            else SetupPerformanceMode();
             UpdatePositions();
         }
 

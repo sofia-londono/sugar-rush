@@ -707,13 +707,41 @@ namespace SugarRush.EditorTools
         }
 
         /// <summary>
+        /// Invisible guide walls (points on the road surface). End of the bridge:
+        /// karts landing wide hit the front of a candy prop or wedge in the 1 m gap beside the
+        /// rainbow ramp (seg 94); this diagonal steers them onto the ramp.
+        /// </summary>
+        static readonly Vector3[][] GuideWalls =
+        {
+            new[] { new Vector3(-36.5f, 20.1f, 59f), new Vector3(-28.6f, 20.1f, 55.1f), new Vector3(-25f, 19f, 55.9f), new Vector3(-21.5f, 18f, 56.6f) },
+        };
+
+        /// <summary>Racing-line points where karts leave the ground: ring exit and the plateau drop to the bridge.</summary>
+        static readonly int[] JumpLips = { 74, 89 };
+
+        /// <summary>True if any part of edge a-b passes within 5 m (flat) of a jump lip.</summary>
+        static bool NearJumpLip(TrackPath path, Vector3 a, Vector3 b)
+        {
+            a.y = b.y = 0f;
+            foreach (int lip in JumpLips)
+            {
+                Vector3 p = path.Point(lip);
+                p.y = 0f;
+                Vector3 ab = b - a;
+                float t = ab.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector3.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+                if (Vector3.Distance(a + ab * t, p) < 5f) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Invisible walls along open road edges that drop off (bridges, cliffs). Edges with any
         /// track surface just beyond them (holes in the road mesh, drivable shoulders) stay open,
-        /// and so do edges that cross the racing line (e.g. the little jump leaving the ring).
+        /// and so do edges that cross the racing line or sit on a jump lip (<see cref="JumpLips"/>).
         /// </summary>
         static string BuildWalls(WeldedMesh road, TrackPath path)
         {
-            const float height = 2.5f, below = 1f, probe = 1.5f, maxDrop = 3f, crossingDistance = 3.5f;
+            const float height = 2.5f, below = 1f, probe = 1.5f, maxDrop = 3f, crossingDistance = 3.5f, jumpLipClearance = 2.5f;
             var verts = new List<Vector3>();
             var tris = new List<int>();
             int skipped = 0, crossings = 0;
@@ -729,8 +757,14 @@ namespace SugarRush.EditorTools
                 flat.y = 0f;
                 Vector3 edgeFlat = Vector3.ProjectOnPlane(edge, Vector3.up).normalized;
                 Vector3 pathFlat = Vector3.ProjectOnPlane(path.Direction(seg), Vector3.up).normalized;
-                bool acrossTheRoad = Mathf.Abs(Vector3.Dot(edgeFlat, pathFlat)) < 0.5f;
+                float alongPath = Mathf.Abs(Vector3.Dot(edgeFlat, pathFlat));
+                bool acrossTheRoad = alongPath < 0.5f;
                 if (flat.magnitude < crossingDistance && acrossTheRoad) { crossings++; continue; }
+                // Jump lips: the road mesh breaks into little edges right where karts take off.
+                // Any wall there that faces the kart or stands near the line stops it dead.
+                if (NearJumpLip(path, a, b) && (alongPath < 0.75f || flat.magnitude < jumpLipClearance)) { crossings++; continue; }
+                // Scraps of edge right by the line only snag karts.
+                if (edge.magnitude < 0.5f && flat.magnitude < jumpLipClearance) { crossings++; continue; }
 
                 Vector3 outward = Vector3.Cross(Vector3.up, edge).normalized;
                 Vector3 mid = (a + b) * 0.5f;
@@ -747,6 +781,19 @@ namespace SugarRush.EditorTools
                 verts.Add(b + Vector3.up * height);
                 tris.AddRange(new[] { i, i + 2, i + 1, i + 1, i + 2, i + 3 });
             }
+
+            // Hand-placed guides where the mesh leaves no edge to wall off (see GuideWalls).
+            foreach (var line in GuideWalls)
+                for (int g = 0; g + 1 < line.Length; g++)
+                {
+                    Vector3 a = line[g], b = line[g + 1];
+                    int i = verts.Count;
+                    verts.Add(a - Vector3.up * below);
+                    verts.Add(b - Vector3.up * below);
+                    verts.Add(a + Vector3.up * height);
+                    verts.Add(b + Vector3.up * height);
+                    tris.AddRange(new[] { i, i + 2, i + 1, i + 1, i + 2, i + 3 });
+                }
 
             var mesh = new Mesh { name = "TrackWalls", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(verts);
