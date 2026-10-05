@@ -936,11 +936,11 @@
 }
 
 .candy-chip--coins {
-    background-color: #FFF0B3;
+    background-color: #FFE0F0;
 }
 
 .candy-chip--coins > .candy-chip__label {
-    color: #A86F00;
+    color: #C2307A;
 }
 
 .coin-row__hammer {
@@ -997,4 +997,11 @@
 .local-hint--small {
     font-size: 26px;
     color: #FFE6F3;
+}
+
+/* Wrapped candy icon next to the candies counter (point 4). */
+.candy-icon {
+    width: 64px;
+    height: 40px;
+    margin-right: 6px;
 }

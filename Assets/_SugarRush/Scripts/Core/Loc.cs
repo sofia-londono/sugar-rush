@@ -99,6 +99,7 @@ namespace SugarRush
             // Ralph's chaos
             ["chaos.incoming"] = ("¡Ralph viene!", "Ralph is coming!"),
             ["chaos.hammer"] = ("¡Martillo listo!", "Hammer ready!"),
+            ["chaos.candies"] = ("{0}/{1} dulces", "{0}/{1} candies"),
             ["chaos.fixed"] = ("¡Yo lo arreglo!", "I can fix it!"),
 
             // HUD

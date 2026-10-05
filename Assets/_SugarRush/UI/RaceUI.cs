@@ -152,10 +152,10 @@ namespace SugarRush
             posRow.Add(h.Total);
             topLeft.Add(posRow);
 
-            // Ralph's chaos: coins carried, and Felix's hammer once there are enough.
+            // Ralph's chaos: candies carried, and Felix's hammer once there are enough.
             h.CoinRow = UIKit.Div("hud-row", "coin-row");
-            h.CoinRow.Add(UIKit.Div("coin-icon"));
-            h.Coins = UIKit.Chip(h.CoinRow, "0/5", "candy-chip--coins");
+            h.CoinRow.Add(new WrappedCandyIcon());
+            h.Coins = UIKit.Chip(h.CoinRow, Loc.T("chaos.candies", 0, 5), "candy-chip--coins");
             h.Hammer = UIKit.Title(Loc.T("chaos.hammer"), CandyTone.Lemon, "candy-title--sm");
             h.Hammer.AddToClassList("coin-row__hammer");
             h.CoinRow.Add(h.Hammer);
@@ -245,7 +245,7 @@ namespace SugarRush
             if (chaosOn)
             {
                 int coins = chaos.CoinsOf(player);
-                h.Coins.text = $"{coins}/{chaos.hammerCost}";
+                h.Coins.text = Loc.T("chaos.candies", coins, chaos.hammerCost);
                 bool hammer = coins >= chaos.hammerCost;
                 h.Hammer.EnableInClassList("hidden", !hammer);
                 // Gentle pulse so a ready hammer is noticed.

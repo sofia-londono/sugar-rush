@@ -306,6 +306,64 @@ namespace SugarRush
         }
     }
 
+    /// <summary>HUD icon: a wrapped candy (round body, two twisted wrapper ends, a stripe and shine).</summary>
+    public class WrappedCandyIcon : VisualElement
+    {
+        static readonly Color Body = new(1f, 0.45f, 0.72f), Wrapper = new(1f, 0.86f, 0.94f);
+
+        public WrappedCandyIcon()
+        {
+            pickingMode = PickingMode.Ignore;
+            AddToClassList("candy-icon");
+            generateVisualContent += Draw;
+            RegisterCallback<GeometryChangedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        void Draw(MeshGenerationContext ctx)
+        {
+            float w = layout.width, h = layout.height;
+            if (!(w >= 2f && h >= 2f)) return; // also rejects NaN before the first layout
+            var p = ctx.painter2D;
+            var c = new Vector2(w * 0.5f, h * 0.5f);
+            float r = Mathf.Min(w * 0.26f, h * 0.42f);
+
+            // Wrapper ends: little bow-tie triangles with a white outline.
+            foreach (float side in new[] { -1f, 1f })
+            {
+                p.fillColor = Wrapper;
+                p.strokeColor = Color.white;
+                p.lineWidth = 3f;
+                p.BeginPath();
+                p.MoveTo(c + new Vector2(side * r * 0.8f, 0f));
+                p.LineTo(c + new Vector2(side * (w * 0.5f - 2f), -h * 0.4f));
+                p.LineTo(c + new Vector2(side * (w * 0.5f - 6f), 0f));
+                p.LineTo(c + new Vector2(side * (w * 0.5f - 2f), h * 0.4f));
+                p.ClosePath();
+                p.Fill();
+                p.Stroke();
+            }
+
+            p.fillColor = Body;
+            p.BeginPath();
+            p.Arc(c, r, Angle.Degrees(0f), Angle.Degrees(360f));
+            p.Fill();
+            p.strokeColor = Color.white;
+            p.lineWidth = 4f;
+            p.Stroke();
+
+            // A white swirl stripe and a shine.
+            p.strokeColor = new Color(1f, 1f, 1f, 0.85f);
+            p.lineWidth = r * 0.3f;
+            p.BeginPath();
+            p.Arc(c, r * 0.55f, Angle.Degrees(200f), Angle.Degrees(340f));
+            p.Stroke();
+            p.fillColor = new Color(1f, 1f, 1f, 0.7f);
+            p.BeginPath();
+            p.Arc(c + new Vector2(-r * 0.35f, -r * 0.4f), r * 0.18f, Angle.Degrees(0f), Angle.Degrees(360f));
+            p.Fill();
+        }
+    }
+
     /// <summary>Round peppermint candy (alternating wedges, white rim, shine).</summary>
     public class PeppermintDisc : VisualElement
     {

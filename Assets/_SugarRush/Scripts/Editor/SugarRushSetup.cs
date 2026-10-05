@@ -1109,14 +1109,27 @@ namespace SugarRush.EditorTools
                 GetMaterial("Chaos/Cookie", lit, new Color(0.86f, 0.62f, 0.38f)),
                 chocolate,
             };
-            var gold = GetMaterial("Chaos/Gold", lit, new Color(1f, 0.76f, 0.2f));
-            gold.SetFloat("_Metallic", 0.65f);
-            gold.SetFloat("_Smoothness", 0.75f);
-            gold.EnableKeyword("_EMISSION");
-            gold.SetColor("_EmissionColor", new Color(0.45f, 0.3f, 0.04f));
-            gold.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-            gold.enableInstancing = true;
-            EditorUtility.SetDirty(gold);
+            // Wrapped candies (the chaos "coins"): one shared mesh, four glossy colours + a wrapper.
+            Material Sweet(string name, Color color)
+            {
+                var m = GetMaterial($"Chaos/{name}", lit, color);
+                m.SetFloat("_Smoothness", 0.8f);
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", color * 0.25f);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                m.enableInstancing = true;
+                EditorUtility.SetDirty(m);
+                return m;
+            }
+            var sweets = new[]
+            {
+                Sweet("SweetPink", new Color(1f, 0.38f, 0.68f)),
+                Sweet("SweetMint", new Color(0.35f, 0.88f, 0.7f)),
+                Sweet("SweetLemon", new Color(1f, 0.82f, 0.25f)),
+                Sweet("SweetLavender", new Color(0.66f, 0.5f, 1f)),
+            };
+            var wrapper = Sweet("SweetWrapper", new Color(1f, 0.93f, 0.97f));
+            var candyMesh = BuildWrappedCandyMesh();
 
             var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             var cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
@@ -1164,7 +1177,7 @@ namespace SugarRush.EditorTools
             }
             chaos.zones = zones.ToArray();
 
-            // Coins: pairs along the road, beside the racing line.
+            // Candies: pairs along the road, beside the racing line.
             var coinList = new List<Transform>();
             foreach (var (seg, lateral) in CoinRows)
                 for (int k = 0; k < 2; k++)
@@ -1174,14 +1187,14 @@ namespace SugarRush.EditorTools
                     float lat = Mathf.Clamp(lateral, -Mathf.Max(0f, l - 1f), Mathf.Max(0f, r - 1f));
                     Vector3 rightVec = Vector3.Cross(Vector3.up, Vector3.ProjectOnPlane(path.DirectionAtDistance(d), Vector3.up)).normalized;
                     var hit = GroundHit(path.PositionAtDistance(d) + rightVec * lat);
-                    var coin = new GameObject($"Coin_{coinList.Count:00}");
+                    var coin = new GameObject($"Candy_{coinList.Count:00}");
                     coin.transform.SetParent(root.transform, false);
                     coin.transform.position = hit.point + Vector3.up * 1f;
-                    coin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stand the disc up
-                    coin.transform.localScale = new Vector3(0.9f, 0.05f, 0.9f);
-                    coin.AddComponent<MeshFilter>().sharedMesh = cylinder;
+                    coin.transform.localRotation = Quaternion.Euler(0f, 0f, 18f); // a little tilt, spun around Y
+                    coin.transform.localScale = Vector3.one * 0.85f;
+                    coin.AddComponent<MeshFilter>().sharedMesh = candyMesh;
                     var mr = coin.AddComponent<MeshRenderer>();
-                    mr.sharedMaterial = gold;
+                    mr.sharedMaterials = new[] { sweets[coinList.Count % sweets.Length], wrapper };
                     mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                     coinList.Add(coin.transform);
                 }
@@ -1262,6 +1275,69 @@ namespace SugarRush.EditorTools
             renderer.sharedMaterial = mat;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return ps;
+        }
+
+        /// <summary>
+        /// A wrapped candy: an egg-shaped body along X with a crinkled, twisted wrapper flaring
+        /// out of each end (submesh 0 = body, 1 = wrapper; the wrapper is double-sided). ~350 triangles.
+        /// </summary>
+        static Mesh BuildWrappedCandyMesh()
+        {
+            string path = $"{GeneratedDir}/WrappedCandy.asset";
+            var verts = new List<Vector3>();
+            var body = new List<int>();
+            var wrap = new List<int>();
+            const int lon = 14, lat = 10;
+            for (int j = 0; j <= lat; j++)
+            {
+                float v = j / (float)lat * Mathf.PI;
+                for (int i = 0; i <= lon; i++)
+                {
+                    float u = i / (float)lon * Mathf.PI * 2f;
+                    verts.Add(new Vector3(Mathf.Cos(v) * 0.42f, Mathf.Sin(v) * Mathf.Cos(u) * 0.3f, Mathf.Sin(v) * Mathf.Sin(u) * 0.3f));
+                }
+            }
+            for (int j = 0; j < lat; j++)
+                for (int i = 0; i < lon; i++)
+                {
+                    int a = j * (lon + 1) + i, b = a + lon + 1;
+                    body.AddRange(new[] { a, a + 1, b, a + 1, b + 1, b });
+                }
+            foreach (float side in new[] { -1f, 1f })
+                for (int face = 0; face < 2; face++) // front and back as separate vertices, so each gets its own normal
+                {
+                    const int seg = 12;
+                    int neck = verts.Count;
+                    for (int i = 0; i <= seg; i++)
+                    {
+                        float u = i / (float)seg * Mathf.PI * 2f;
+                        verts.Add(new Vector3(side * 0.44f, Mathf.Cos(u) * 0.07f, Mathf.Sin(u) * 0.07f));
+                    }
+                    int rim = verts.Count;
+                    for (int i = 0; i <= seg; i++)
+                    {
+                        float u = i / (float)seg * Mathf.PI * 2f + side * 0.6f; // twisted
+                        float r = 0.24f * (1f + 0.22f * Mathf.Cos(u * 6f));     // crinkled edge
+                        verts.Add(new Vector3(side * 0.72f, Mathf.Cos(u) * r, Mathf.Sin(u) * r));
+                    }
+                    for (int i = 0; i < seg; i++)
+                    {
+                        int a = neck + i, b = rim + i;
+                        if (face == 0) wrap.AddRange(new[] { a, b, a + 1, a + 1, b, b + 1 });
+                        else wrap.AddRange(new[] { a, a + 1, b, a + 1, b + 1, b });
+                    }
+                }
+            var mesh = new Mesh { name = "WrappedCandy" };
+            mesh.SetVertices(verts);
+            mesh.subMeshCount = 2;
+            mesh.SetTriangles(body, 0);
+            mesh.SetTriangles(wrap, 1);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            EnsureFolder(GeneratedDir);
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            return mesh;
         }
 
         /// <summary>
