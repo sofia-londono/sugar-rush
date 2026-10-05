@@ -1399,6 +1399,7 @@ namespace SugarRush.EditorTools
             // Read the start line from the race scene's racing line so the turntable sits on the road.
             EditorSceneManager.OpenScene(RaceScenePath, OpenSceneMode.Single);
             var path = Object.FindFirstObjectByType<TrackPath>();
+            var route = (Vector3[])path.points.Clone(); // the race scene closes below
             Vector3 spot = path.Point(4);
             Vector3 dir = Vector3.ProjectOnPlane(path.Direction(4), Vector3.up).normalized;
 
@@ -1467,10 +1468,59 @@ namespace SugarRush.EditorTools
             menu.document = ui;
             menu.roster = showcase.roster;
             menu.showcase = showcase;
+            menu.tour = BuildMenuTour(route, cam, showcase.roster);
             AddEventSystem();
 
             EditorSceneManager.SaveScene(scene, MenuScenePath);
             return "Menu scene saved: " + MenuScenePath;
+        }
+
+        /// <summary>
+        /// Main page background: the five racers lined up under the START arch, and a slow camera
+        /// tour of the prettiest spots (picked from rendered views along the track).
+        /// </summary>
+        static MenuCameraTour BuildMenuTour(Vector3[] route, Camera cam, KartRoster roster)
+        {
+            const int arch = 139; // the racers line up just in front of the START arch
+            int n = route.Length;
+            Vector3 Flat(Vector3 v) => Vector3.ProjectOnPlane(v, Vector3.up).normalized;
+            Vector3 P(int i) => route[((i % n) + n) % n];
+            Vector3 D(int i) => Flat(P(i + 1) - P(i));
+            Vector3 Rt(int i) => Vector3.Cross(Vector3.up, D(i));
+
+            var lineupGo = new GameObject("RacerLineup");
+            var lineup = lineupGo.AddComponent<RacerLineup>();
+            lineup.roster = roster;
+            lineup.spots = new Transform[roster.karts.Length];
+            for (int k = 0; k < roster.karts.Length; k++)
+            {
+                var spot = new GameObject($"Spot{k + 1}").transform;
+                spot.SetParent(lineupGo.transform, false);
+                float lateral = (k - (roster.karts.Length - 1) * 0.5f) * 2.4f;
+                spot.position = P(arch) + Rt(arch) * lateral + Vector3.up * 0.05f;
+                spot.rotation = Quaternion.LookRotation(-D(arch), Vector3.up); // facing the camera
+                lineup.spots[k] = spot;
+            }
+
+            var tour = new GameObject("MenuCameraTour").AddComponent<MenuCameraTour>();
+            tour.cam = cam;
+            Vector3 up = Vector3.up;
+            tour.shots = new[]
+            {
+                // The racers under the START arch, dollying in.
+                new MenuCameraTour.Shot { fromPosition = P(arch) - D(arch) * 11f + Rt(arch) * 2f + up * 2.6f, toPosition = P(arch) - D(arch) * 7f + Rt(arch) * 0.5f + up * 2f,
+                                          fromLook = P(arch) + up * 2.2f, toLook = P(arch) + up * 1.6f, duration = 10f },
+                // Ferris-wheel town, sliding sideways.
+                new MenuCameraTour.Shot { fromPosition = P(119) + up * 14f - Rt(119) * 18f - D(119) * 6f, toPosition = P(119) + up * 13f - Rt(119) * 16f + D(119) * 6f,
+                                          fromLook = P(119) + Rt(119) * 20f - D(119) * 4f, toLook = P(119) + Rt(119) * 20f + D(119) * 6f, duration = 9f },
+                // The giant cake.
+                new MenuCameraTour.Shot { fromPosition = P(63) + up * 14f - Rt(63) * 18f - D(63) * 5f, toPosition = P(63) + up * 12f - Rt(63) * 15f + D(63) * 5f,
+                                          fromLook = P(63) + Rt(63) * 20f, toLook = P(63) + Rt(63) * 20f + D(63) * 4f, duration = 9f },
+                // Candy canes by the rainbow road.
+                new MenuCameraTour.Shot { fromPosition = P(84) - D(84) * 12f + up * 6f, toPosition = P(84) - D(84) * 4f + up * 5f,
+                                          fromLook = P(84) + D(84) * 25f, toLook = P(84) + D(84) * 30f + up * 1f, duration = 9f },
+            };
+            return tour;
         }
 
         [MenuItem("Sugar Rush/7. Build Settings")]

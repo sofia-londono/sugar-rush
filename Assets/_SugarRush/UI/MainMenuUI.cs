@@ -17,6 +17,9 @@ namespace SugarRush
         public UIDocument document;
         public KartRoster roster;
         public KartShowcase showcase;
+        [Tooltip("Camera tour of the track behind the main page.")]
+        public MenuCameraTour tour;
+        VisualElement tourFade;
 
         VisualElement root;
         Page page;
@@ -40,6 +43,10 @@ namespace SugarRush
         {
             root = document.rootVisualElement;
             root.Clear();
+            tourFade = UIKit.Div("tour-fade");
+            tourFade.pickingMode = PickingMode.Ignore;
+            tourFade.style.opacity = 0f;
+            root.Add(tourFade); // under everything: the soft pink cut between tour shots
             root.Add(new SprinkleRain(40));
             previewKart = GameSettings.SelectedKart;
             // Back from an online race: straight to the waiting room.
@@ -50,6 +57,7 @@ namespace SugarRush
 
         void Update()
         {
+            if (tourFade != null) tourFade.style.opacity = tour ? tour.Fade : 0f;
             if (leaving) return;
             if (page == Page.Lobby) UpdateLobby();
             if (page == Page.Local) { UpdateLocal(); return; }
@@ -82,7 +90,10 @@ namespace SugarRush
                 _ => BuildMain(),
             };
             UIKit.ShowScreen(root, screen);
+            // Main page: the camera tours the track; every other page looks at the kart turntable.
+            if (tour && page != Page.Main) tour.SetActive(false);
             showcase.SetDuoMode(page == Page.Local);
+            if (tour && page == Page.Main) tour.SetActive(true);
             showcase.Show(page == Page.Characters ? previewKart : GameSettings.SelectedKart);
         }
 
@@ -97,15 +108,18 @@ namespace SugarRush
             column.Add(UIKit.Title("Sugar Rush", CandyTone.Rainbow, "candy-title--xl"));
             column.Add(UIKit.Label(Loc.T("menu.subtitle"), "subtitle"));
 
-            var play = UIKit.Button(Loc.T("menu.play"), Play, "candy-button--menu");
+            // One big "Play", the other modes as smaller tiles in a 2x2 grid, "Quit" small at the bottom.
+            var play = UIKit.Button(Loc.T("menu.play"), Play, "candy-button--hero");
             column.Add(play);
-            column.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky", "candy-button--menu"));
+            var tiles = UIKit.Div("menu-tiles");
+            tiles.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky", "candy-button--tile"));
             if (RaceSetup.SplitScreenAvailable)
-                column.Add(UIKit.Button(Loc.T("menu.local"), () => ShowPage(Page.Local), "candy-button--pink-light", "candy-button--menu", "candy-button--long"));
-            column.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint", "candy-button--menu"));
-            column.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender", "candy-button--menu"));
+                tiles.Add(UIKit.Button(Loc.T("menu.local"), () => ShowPage(Page.Local), "candy-button--pink-light", "candy-button--tile"));
+            tiles.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint", "candy-button--tile"));
+            tiles.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender", "candy-button--tile"));
+            column.Add(tiles);
 #if !UNITY_WEBGL
-            column.Add(UIKit.Button(Loc.T("menu.quit"), Quit, "candy-button--lemon", "candy-button--menu"));
+            column.Add(UIKit.Button(Loc.T("menu.quit"), Quit, "candy-button--lemon", "candy-button--small", "candy-button--quit"));
 #endif
 
             float best = GameSettings.GetBestTime(GameSettings.Laps);

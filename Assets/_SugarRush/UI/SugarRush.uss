@@ -1005,3 +1005,48 @@
     height: 40px;
     margin-right: 6px;
 }
+
+/* ---- Main menu layout (point 3): big Play, 2x2 tiles, small Quit ---- */
+.candy-button--hero {
+    width: 600px;
+    height: 128px;
+    margin: 4px 0 22px 0;
+}
+
+.candy-button--hero > .candy-button__label {
+    font-size: 66px;
+}
+
+.menu-tiles {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 640px;
+}
+
+.candy-button--tile {
+    width: 300px;
+    height: 104px;
+    margin: 10px;
+}
+
+.candy-button--tile > .candy-button__label {
+    font-size: 34px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    padding: 0 18px;
+}
+
+.candy-button--quit {
+    margin-top: 20px;
+    width: 220px;
+}
+
+.tour-fade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #FFC9E0;
+}
