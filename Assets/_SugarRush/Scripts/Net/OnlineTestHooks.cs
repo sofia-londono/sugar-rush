@@ -8,6 +8,7 @@ namespace SugarRush
     /// Development helper for testing online play without a second person. Only reacts to
     /// command-line arguments, so normal launches are unaffected:
     ///   -sr-join CODE    join that room as soon as the main menu is up
+    ///   -sr-quick        quick match (join an open public room or create one) once the menu is up
     ///   -sr-autopilot    the computer drives this player's kart in every race
     ///   -sr-local-test   start a split-screen race (both players on autopilot) and log FPS
     ///   -sr-sp-test      start a single-player race on autopilot and log FPS
@@ -17,6 +18,7 @@ namespace SugarRush
     public class OnlineTestHooks : MonoBehaviour
     {
         static string joinCode;
+        static bool quick;
         static bool autopilot;
         static int wantedKart = -1;
         static bool localTest, spTest, uncapped;
@@ -30,6 +32,7 @@ namespace SugarRush
             {
                 if (args[i] == "-sr-join" && i + 1 < args.Length) joinCode = args[i + 1];
                 if (args[i] == "-sr-autopilot") autopilot = true;
+                if (args[i] == "-sr-quick") quick = true;
                 if (args[i] == "-sr-kart" && i + 1 < args.Length) int.TryParse(args[i + 1], out wantedKart);
                 if (args[i] == "-sr-local-test") localTest = true;
                 if (args[i] == "-sr-sp-test") spTest = true;
@@ -37,12 +40,12 @@ namespace SugarRush
                 if (args[i] == "-sr-quality" && i + 1 < args.Length) int.TryParse(args[i + 1], out quality);
             }
             if (localTest || spTest) autopilot = true;
-            if (joinCode == null && !autopilot) return;
+            if (joinCode == null && !autopilot && !quick) return;
 
             var go = new GameObject("OnlineTestHooks");
             DontDestroyOnLoad(go);
             go.AddComponent<OnlineTestHooks>();
-            Debug.Log($"[SR] test hooks: join={joinCode} autopilot={autopilot}");
+            Debug.Log($"[SR] test hooks: join={joinCode} quick={quick} autopilot={autopilot}");
         }
 
         IEnumerator Start()
@@ -65,6 +68,16 @@ namespace SugarRush
                     RaceSetup.SetLocalSplit(new[] { new RaceSetup.LocalPlayer { Kart = 0 }, new RaceSetup.LocalPlayer { Kart = 1 } });
                 else RaceSetup.SetSingle();
                 SceneManager.LoadScene(SceneNames.Race);
+                yield break;
+            }
+
+            if (quick)
+            {
+                yield return new WaitForSeconds(2f);
+                var match = OnlineSession.QuickJoinAsync();
+                while (!match.IsCompleted) yield return null;
+                Debug.Log($"[SR] quick: ok={match.Result} created={OnlineSession.QuickJoinCreated} host={OnlineSession.IsHost} " +
+                          $"public={OnlineSession.IsPublic} code={OnlineSession.Code} err={OnlineSession.LastErrorKey} {OnlineSession.LastError}");
                 yield break;
             }
 

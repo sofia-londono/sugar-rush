@@ -889,3 +889,23 @@
     color: var(--mint-dark);
     margin: 8px 0 4px 0;
 }
+
+/* Online page: "Create room" next to the private / public switch. */
+.create-row {
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.create-row > .option-row {
+    width: 440px;
+    margin-left: 20px;
+    padding-left: 26px;
+}
+
+/* Waiting room: "we made a room for you" / "found a room" after a quick match. */
+.lobby-notice {
+    font-size: 28px;
+    margin-top: 2px;
+    margin-bottom: 14px;
+}

@@ -11,8 +11,9 @@ using UnityEngine.SceneManagement;
 namespace SugarRush
 {
     /// <summary>
-    /// Online play entry point: Unity Services sign-in, creating / joining a room by code
-    /// (Lobby + Relay through the Multiplayer Services "sessions" API) and leaving.
+    /// Online play entry point: Unity Services sign-in, creating a public or private room,
+    /// joining by code, quick join (any open public room, else a new one) and leaving.
+    /// Lobby + Relay through the Multiplayer Services "sessions" API.
     /// The NetworkManager only exists while online, so single player never touches networking.
     /// Relay always uses secure WebSockets so desktop, phone and browser players can mix.
     /// </summary>
@@ -20,11 +21,20 @@ namespace SugarRush
     {
         public const int MaxPlayers = 5;
         const string NetworkManagerResource = "Net/NetworkManager";
+        /// <summary>
+        /// Quick join only matches rooms made by a compatible build. Bump it whenever the
+        /// network messages change, so old tabs / copies don't land in new rooms.
+        /// </summary>
+        const string ProtocolVersion = "sr1";
+        const string VersionProperty = "v";
 
         public static ISession Session { get; private set; }
         public static bool IsOnline => Session != null && NetworkManager.Singleton && NetworkManager.Singleton.IsListening;
         public static bool IsHost => IsOnline && NetworkManager.Singleton.IsHost;
         public static string Code => Session?.Code;
+        public static bool IsPublic => Session != null && !Session.IsPrivate;
+        /// <summary>True when the last quick join found no open room and created a new one.</summary>
+        public static bool QuickJoinCreated { get; private set; }
         public static string LastError { get; private set; }
         /// <summary>Loc key explaining the last failure to the player.</summary>
         public static string LastErrorKey { get; private set; }
@@ -62,18 +72,32 @@ namespace SugarRush
 
         static NetworkOptions SecureWebSockets => new() { RelayProtocol = RelayProtocol.WSS };
 
-        /// <summary>Creates a private room and starts hosting it. Returns false (see LastError) on failure.</summary>
-        public static async Task<bool> CreateRoomAsync()
+        static SessionOptions RoomOptions(bool isPublic) => new SessionOptions
+            {
+                MaxPlayers = MaxPlayers,
+                IsPrivate = !isPublic,
+                SessionProperties =
+                {
+                    [VersionProperty] = new SessionProperty(ProtocolVersion, VisibilityPropertyOptions.Public, PropertyIndex.String1),
+                },
+            }
+            .WithNetworkOptions(SecureWebSockets)
+            .WithRelayNetwork();
+
+        /// <summary>
+        /// Creates a room and starts hosting it. Private rooms are only reachable by code; public
+        /// ones also take quick-join players. Returns false (see LastError) on failure.
+        /// </summary>
+        public static async Task<bool> CreateRoomAsync(bool isPublic = false)
         {
             try
             {
                 LastError = null;
+                LastErrorKey = null;
+                QuickJoinCreated = false;
                 await EnsureSignedInAsync();
                 EnsureNetworkManager();
-                var options = new SessionOptions { MaxPlayers = MaxPlayers, IsPrivate = true }
-                    .WithNetworkOptions(SecureWebSockets)
-                    .WithRelayNetwork();
-                Session = await MultiplayerService.Instance.CreateSessionAsync(options);
+                Session = await MultiplayerService.Instance.CreateSessionAsync(RoomOptions(isPublic));
                 NetLobby.SpawnForHost();
                 return true;
             }
@@ -112,6 +136,42 @@ namespace SugarRush
             }
         }
 
+        /// <summary>
+        /// Joins any open public room of this version (not full, not mid-race); if there is none,
+        /// creates a public one and hosts it. Returns false (see LastError) on failure.
+        /// </summary>
+        public static async Task<bool> QuickJoinAsync()
+        {
+            try
+            {
+                LastError = null;
+                LastErrorKey = null;
+                await EnsureSignedInAsync();
+                EnsureNetworkManager();
+                var quick = new QuickJoinOptions
+                {
+                    Filters = { new FilterOption(FilterField.StringIndex1, ProtocolVersion, FilterOperation.Equal) },
+                    Timeout = TimeSpan.Zero, // one look; nothing open -> create right away
+                    CreateSession = true,
+                };
+                Session = await MultiplayerService.Instance.MatchmakeSessionAsync(quick, RoomOptions(isPublic: true));
+                QuickJoinCreated = Session.IsHost;
+                if (Session.IsHost) NetLobby.SpawnForHost();
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Usually a room whose host just vanished (closed tab) and whose listing hasn't
+                // expired yet: rather than an error, open a fresh public room.
+                Debug.LogWarning("[SR] quick match failed, creating a room instead: " + e.Message);
+                await CleanupAsync();
+                bool created = await CreateRoomAsync(isPublic: true);
+                QuickJoinCreated = created;
+                if (!created && LastErrorKey == "online.notFound") LastErrorKey = "online.error"; // there was no code to get wrong
+                return created;
+            }
+        }
+
         /// <summary>Joins a room by its short code. Returns false (see LastError) on failure.</summary>
         public static async Task<bool> JoinRoomAsync(string code)
         {
@@ -119,6 +179,7 @@ namespace SugarRush
             {
                 LastError = null;
                 LastErrorKey = null;
+                QuickJoinCreated = false;
                 await EnsureSignedInAsync();
                 EnsureNetworkManager();
                 var options = new JoinSessionOptions().WithNetworkOptions(SecureWebSockets);

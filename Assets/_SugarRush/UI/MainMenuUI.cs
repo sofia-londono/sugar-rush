@@ -29,7 +29,7 @@ namespace SugarRush
         VisualElement onlineButtons, lobbyRows;
         CandyTitle lobbyKartName, lobbyCount;
         int shownLobbyVersion = -1;
-        bool connecting;
+        bool connecting, justJoined;
 
         // Character page widgets that change when cycling karts
         CandyTitle charName;
@@ -338,8 +338,14 @@ namespace SugarRush
             panel.Add(heading);
 
             onlineButtons = UIKit.Div("menu-column");
-            var create = UIKit.Button(Loc.T("online.create"), CreateRoom, "candy-button--sky");
-            onlineButtons.Add(create);
+            var quick = UIKit.Button(Loc.T("online.quick"), QuickJoin);
+            onlineButtons.Add(quick);
+            onlineButtons.Add(UIKit.Label(Loc.T("online.quickNote"), "panel-note"));
+
+            var createRow = UIKit.Div("row", "create-row");
+            createRow.Add(UIKit.Button(Loc.T("online.create"), CreateRoom, "candy-button--sky", "candy-button--small"));
+            createRow.Add(OptionRow("online.roomType", () => Loc.T(createPublic ? "online.public" : "online.private"), _ => createPublic = !createPublic));
+            onlineButtons.Add(createRow);
             onlineButtons.Add(UIKit.Label(Loc.T("online.or"), "panel-note"));
 
             var joinRow = UIKit.Div("row");
@@ -359,15 +365,29 @@ namespace SugarRush
             panel.Add(UIKit.BackButton(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small"));
 
             screen.Add(panel);
-            UIKit.FocusLater(create);
+            UIKit.FocusLater(quick);
             return screen;
+        }
+
+        /// <summary>Remembered while the game is open; new rooms start private.</summary>
+        static bool createPublic;
+
+        async void QuickJoin()
+        {
+            if (connecting) return;
+            SetConnecting(true, "online.searching");
+            bool ok = await OnlineSession.QuickJoinAsync();
+            if (!this) return;
+            SetConnecting(false);
+            if (ok) { justJoined = true; ShowPage(Page.Lobby); }
+            else onlineStatus.text = Loc.T(OnlineSession.LastErrorKey ?? "online.error");
         }
 
         async void CreateRoom()
         {
             if (connecting) return;
             SetConnecting(true);
-            bool ok = await OnlineSession.CreateRoomAsync();
+            bool ok = await OnlineSession.CreateRoomAsync(createPublic);
             if (!this) return;
             SetConnecting(false);
             if (ok) ShowPage(Page.Lobby);
@@ -387,11 +407,11 @@ namespace SugarRush
             else onlineStatus.text = Loc.T(OnlineSession.LastErrorKey ?? "online.error");
         }
 
-        void SetConnecting(bool value)
+        void SetConnecting(bool value, string messageKey = "online.connecting")
         {
             connecting = value;
             if (onlineButtons != null) onlineButtons.SetEnabled(!value);
-            if (onlineStatus != null) onlineStatus.text = value ? Loc.T("online.connecting") : "";
+            if (onlineStatus != null) onlineStatus.text = value ? Loc.T(messageKey) : "";
         }
 
         VisualElement BuildLobby()
@@ -406,6 +426,11 @@ namespace SugarRush
             code.AddToClassList("room-code");
             panel.Add(code);
             panel.Add(UIKit.Label(Loc.T("lobby.share"), "panel-note"));
+            panel.Add(UIKit.Label(Loc.T(OnlineSession.IsPublic ? "lobby.public" : "lobby.private"), "panel-note"));
+            // Only right after a quick join: coming back from a race shows the plain room.
+            if (justJoined)
+                panel.Add(UIKit.Label(Loc.T(OnlineSession.QuickJoinCreated ? "lobby.quickCreated" : "lobby.quickJoined"), "online-status", "lobby-notice"));
+            justJoined = false;
 
             lobbyCount = UIKit.Title("", CandyTone.Lavender, "candy-title--sm");
             panel.Add(lobbyCount);
