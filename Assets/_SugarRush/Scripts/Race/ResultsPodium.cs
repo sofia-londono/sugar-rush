@@ -5,8 +5,9 @@ namespace SugarRush
 {
     /// <summary>
     /// A little candy podium far below the track, filmed by its own camera into a texture that
-    /// the results screen shows: the top three racers' characters stand on it (the winner
-    /// cheers, the others clap). Nothing here exists or renders until the results appear.
+    /// the results screen shows: the top three karts stand on it with their racers sitting in
+    /// them (the winner cheers, the others clap). Nothing here exists or renders until the
+    /// results appear.
     /// </summary>
     public class ResultsPodium : MonoBehaviour
     {
@@ -34,8 +35,13 @@ namespace SugarRush
                 characters = new GameObject[roster.karts.Length];
                 for (int i = 0; i < characters.Length; i++)
                 {
-                    characters[i] = CharacterPuppet.Create(roster.karts[i], transform, standeeMaterial);
-                    if (characters[i]) characters[i].SetActive(false);
+                    // Display kart with its racer sitting in it (or the portrait cut-out on top if there's no model).
+                    characters[i] = KartShowcase.CreateDisplayKart(roster.karts[i].prefab, transform);
+                    if (!CharacterPuppet.CreateDriver(roster.karts[i], characters[i].transform))
+                    {
+                        var standee = CharacterPuppet.Create(roster.karts[i], characters[i].transform, standeeMaterial);
+                        if (standee) standee.transform.localPosition = Vector3.up * 0.5f;
+                    }
                 }
                 texture = new RenderTexture(resolution.x, resolution.y, 24) { name = "PodiumView", antiAliasing = 2 };
                 podiumCamera.targetTexture = texture;
@@ -56,7 +62,7 @@ namespace SugarRush
                 go.transform.SetParent(spots[place], false);
                 go.transform.localPosition = Vector3.zero;
                 go.transform.localRotation = Quaternion.identity;
-                var puppet = go.GetComponent<CharacterPuppet>();
+                var puppet = go.GetComponentInChildren<CharacterPuppet>();
                 if (puppet)
                 {
                     puppet.mood = place == 0 ? CharacterPuppet.Mood.Cheer : CharacterPuppet.Mood.Clap;

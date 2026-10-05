@@ -21,6 +21,8 @@ namespace SugarRush
         public static int Laps { get; set; } = 3;
         /// <summary>Ralph smashes the road during races; coins and Felix's hammer fix it.</summary>
         public static bool RalphChaos { get; set; } = true;
+        /// <summary>Racers sitting in their karts during races (a baked, unanimated mesh each).</summary>
+        public static bool DriversInRace { get; set; } = true;
         public static int SelectedKart { get; set; }
 
         public static event Action Changed;
@@ -41,6 +43,7 @@ namespace SugarRush
             Quality = PlayerPrefs.GetInt("settingsVersion", 1) < 2 ? 0 : PlayerPrefs.GetInt("quality", 0);
             Laps = Mathf.Clamp(PlayerPrefs.GetInt("laps", 3), MinLaps, MaxLaps);
             RalphChaos = PlayerPrefs.GetInt("ralphChaos", 1) != 0;
+            DriversInRace = PlayerPrefs.GetInt("drivers", 1) != 0;
             SelectedKart = PlayerPrefs.GetInt("kart", 0);
             Apply();
         }
@@ -55,6 +58,7 @@ namespace SugarRush
             PlayerPrefs.SetInt("settingsVersion", 2);
             PlayerPrefs.SetInt("laps", Laps);
             PlayerPrefs.SetInt("ralphChaos", RalphChaos ? 1 : 0);
+            PlayerPrefs.SetInt("drivers", DriversInRace ? 1 : 0);
             PlayerPrefs.SetInt("kart", SelectedKart);
             PlayerPrefs.Save();
             Apply();

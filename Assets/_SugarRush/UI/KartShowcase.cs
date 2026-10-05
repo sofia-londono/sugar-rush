@@ -3,9 +3,9 @@ using UnityEngine;
 namespace SugarRush
 {
     /// <summary>
-    /// Spinning turntable in the main menu that shows one kart at a time, with its driver
-    /// standing beside it (hops and waves when picked). On the two-player page it switches to
-    /// "duo" mode: player 1's kart and racer on the left, player 2's on the right.
+    /// Spinning turntable in the main menu that shows one kart at a time with its racer sitting
+    /// in it (waves when picked). On the two-player page it switches to "duo" mode: player 1's
+    /// kart on the left, player 2's on the right, each with their racer.
     /// </summary>
     public class KartShowcase : MonoBehaviour
     {
@@ -13,24 +13,25 @@ namespace SugarRush
         public Transform turntable;
         public float spinSpeed = 30f;
         public float popDuration = 0.25f;
-        [Tooltip("Where the racer stands, facing the camera.")]
+        [Tooltip("Where a racer without a 3D model stands (as a cut-out), facing the camera.")]
         public Transform characterSpot;
         public Material standeeMaterial;
 
         [Header("Two players (left = P1, right = P2)")]
         public Transform[] duoKartSpots = new Transform[2];
-        public Transform[] duoCharacterSpots = new Transform[2];
         [Tooltip("Camera pose for the two-player page (straight down the road, both karts centred).")]
         public Transform duoCameraPose;
         Vector3 savedCamPosition;
         Quaternion savedCamRotation;
 
-        GameObject[] karts, characters;
+        GameObject[] karts, standees;
+        CharacterPuppet[] drivers;
         int current = -1;
         float popTime = 1f;
 
         // Duo mode: created on first use, one set per player.
-        GameObject[,] duoKarts, duoCharacters;
+        GameObject[,] duoKarts;
+        CharacterPuppet[,] duoDrivers;
         readonly int[] duoShown = { -1, -1 };
         readonly float[] duoPop = { 1f, 1f };
         bool duo;
@@ -38,21 +39,25 @@ namespace SugarRush
 
         void Awake()
         {
-            karts = new GameObject[roster.karts.Length];
-            for (int i = 0; i < karts.Length; i++) karts[i] = CreateDisplayKart(roster.karts[i].prefab, turntable);
-
-            characters = new GameObject[roster.karts.Length];
-            if (characterSpot)
-                for (int i = 0; i < characters.Length; i++)
+            int n = roster.karts.Length;
+            karts = new GameObject[n];
+            drivers = new CharacterPuppet[n];
+            standees = new GameObject[n];
+            for (int i = 0; i < n; i++)
+            {
+                karts[i] = CreateDisplayKart(roster.karts[i].prefab, turntable);
+                drivers[i] = CharacterPuppet.CreateDriver(roster.karts[i], karts[i].transform);
+                if (!drivers[i] && characterSpot)
                 {
-                    characters[i] = CharacterPuppet.Create(roster.karts[i], characterSpot, standeeMaterial);
-                    if (characters[i]) characters[i].SetActive(false);
+                    standees[i] = CharacterPuppet.Create(roster.karts[i], characterSpot, standeeMaterial);
+                    if (standees[i]) standees[i].SetActive(false);
                 }
+            }
             platform = transform.Find("Platform");
         }
 
         /// <summary>A kart for display only: no physics or driving.</summary>
-        static GameObject CreateDisplayKart(GameObject prefab, Transform parent)
+        public static GameObject CreateDisplayKart(GameObject prefab, Transform parent)
         {
             var go = Instantiate(prefab, parent);
             go.transform.localPosition = Vector3.zero;
@@ -72,16 +77,13 @@ namespace SugarRush
             if (current >= 0)
             {
                 karts[current].SetActive(false);
-                if (characters[current]) characters[current].SetActive(false);
+                if (standees[current]) standees[current].SetActive(false);
             }
             current = index;
             karts[current].SetActive(true);
             popTime = 0f;
-            if (characters[current])
-            {
-                characters[current].SetActive(true);
-                characters[current].GetComponent<CharacterPuppet>()?.Hop();
-            }
+            if (drivers[current]) drivers[current].Hop();
+            if (standees[current]) standees[current].SetActive(true);
         }
 
         // ------------------------------------------------------------ Two players
@@ -108,17 +110,17 @@ namespace SugarRush
             }
         }
 
-        /// <summary>Shows player <paramref name="slot"/>'s racer; a new pick hops, a ready player cheers.</summary>
+        /// <summary>Shows player <paramref name="slot"/>'s kart and racer; a new pick waves, a ready player cheers.</summary>
         public void ShowDuo(int slot, int kart, bool ready)
         {
             if (!duo || slot < 0 || slot > 1 || duoKartSpots[slot] == null) return;
             kart = ((kart % roster.karts.Length) + roster.karts.Length) % roster.karts.Length;
             duoKarts ??= new GameObject[2, roster.karts.Length];
-            duoCharacters ??= new GameObject[2, roster.karts.Length];
+            duoDrivers ??= new CharacterPuppet[2, roster.karts.Length];
             if (!duoKarts[slot, kart])
             {
                 duoKarts[slot, kart] = CreateDisplayKart(roster.karts[kart].prefab, duoKartSpots[slot]);
-                duoCharacters[slot, kart] = CharacterPuppet.Create(roster.karts[kart], duoCharacterSpots[slot], standeeMaterial);
+                duoDrivers[slot, kart] = CharacterPuppet.CreateDriver(roster.karts[kart], duoKarts[slot, kart].transform);
             }
 
             bool changed = duoShown[slot] != kart;
@@ -129,10 +131,7 @@ namespace SugarRush
                 duoKarts[slot, kart].SetActive(true);
                 duoPop[slot] = 0f;
             }
-            var character = duoCharacters[slot, kart];
-            if (!character) return;
-            character.SetActive(true);
-            var puppet = character.GetComponent<CharacterPuppet>();
+            var puppet = duoDrivers[slot, kart];
             if (!puppet) return;
             var mood = ready ? CharacterPuppet.Mood.Cheer : CharacterPuppet.Mood.Idle;
             if (changed || puppet.mood != mood) puppet.Hop();
@@ -145,7 +144,6 @@ namespace SugarRush
             duoShown[slot] = -1;
             if (k < 0 || duoKarts == null) return;
             if (duoKarts[slot, k]) duoKarts[slot, k].SetActive(false);
-            if (duoCharacters[slot, k]) duoCharacters[slot, k].SetActive(false);
         }
 
         void Update()

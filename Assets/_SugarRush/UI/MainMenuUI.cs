@@ -664,6 +664,12 @@ namespace SugarRush
                 GameSettings.Save();
             }));
 
+            panel.Add(OptionRow("opt.drivers", () => Loc.T(GameSettings.DriversInRace ? "opt.on" : "opt.off"), dir =>
+            {
+                GameSettings.DriversInRace = !GameSettings.DriversInRace;
+                GameSettings.Save();
+            }));
+
             panel.Add(OptionRow("opt.chaos", () => Loc.T(GameSettings.RalphChaos ? "opt.on" : "opt.off"), dir =>
             {
                 GameSettings.RalphChaos = !GameSettings.RalphChaos;

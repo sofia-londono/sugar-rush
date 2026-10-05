@@ -847,15 +847,15 @@ namespace SugarRush.EditorTools
             Object.DestroyImmediate(floor.GetComponent<Collider>());
             floor.name = "Floor";
             floor.transform.SetParent(root.transform, false);
-            floor.transform.localScale = new Vector3(9f, 0.05f, 9f);
+            floor.transform.localScale = new Vector3(12f, 0.05f, 12f);
             floor.GetComponent<Renderer>().sharedMaterial = GetMaterial("UI/PodiumFloor", lit, new Color(1f, 0.82f, 0.9f));
 
             // 1st in the middle (tallest), 2nd on the left, 3rd on the right (as seen by the camera at +Z).
             var steps = new (float x, float height, Color color)[]
             {
-                (0f, 1.0f, new Color(1f, 0.85f, 0.35f)),
-                (1.3f, 0.7f, new Color(0.62f, 0.9f, 0.8f)),
-                (-1.3f, 0.45f, new Color(1f, 0.6f, 0.8f)),
+                (0f, 0.8f, new Color(1f, 0.85f, 0.35f)),
+                (2.0f, 0.55f, new Color(0.62f, 0.9f, 0.8f)),
+                (-2.0f, 0.35f, new Color(1f, 0.6f, 0.8f)),
             };
             for (int i = 0; i < 3; i++)
             {
@@ -865,7 +865,7 @@ namespace SugarRush.EditorTools
                 step.name = $"Step{i + 1}";
                 step.transform.SetParent(root.transform, false);
                 step.transform.localPosition = new Vector3(x, h * 0.5f, 0f);
-                step.transform.localScale = new Vector3(1.2f, h, 1.2f);
+                step.transform.localScale = new Vector3(1.9f, h, 2.3f); // karts stand on them, nose to the camera
                 step.GetComponent<Renderer>().sharedMaterial = GetMaterial($"UI/PodiumStep{i + 1}", lit, col);
                 var spot = new GameObject($"Place{i + 1}").transform;
                 spot.SetParent(root.transform, false);
@@ -891,8 +891,8 @@ namespace SugarRush.EditorTools
             cam.fieldOfView = 32f;
             cam.nearClipPlane = 0.1f;
             cam.farClipPlane = 30f;
-            camGo.transform.localPosition = new Vector3(0f, 1.65f, 5.4f);
-            camGo.transform.LookAt(root.transform.position + new Vector3(0f, 1.3f, 0f));
+            camGo.transform.localPosition = new Vector3(0f, 2.3f, 8.2f);
+            camGo.transform.LookAt(root.transform.position + new Vector3(0f, 1.05f, 0f));
             podium.podiumCamera = cam;
             camGo.SetActive(false);
         }
@@ -1368,7 +1368,7 @@ namespace SugarRush.EditorTools
             showcase.characterSpot = characterSpot;
 
             // Two-player page: the camera turns to look straight down the road; each player's kart
-            // sits on its side, angled towards the camera, with the racer beside it (outwards).
+            // (with its racer in it) sits on its side, angled towards the camera.
             var duoCam = new GameObject("DuoCameraPose").transform;
             duoCam.SetParent(showcaseRoot.transform, false);
             // Tilted down so the karts sit in the upper part of the screen, above the players' panels.
@@ -1384,12 +1384,6 @@ namespace SugarRush.EditorTools
                 kartSpot.rotation = Quaternion.LookRotation(Quaternion.Euler(0f, 35f * -side, 0f) * -dir, Vector3.up);
                 showcase.duoKartSpots[i] = kartSpot;
 
-                var charSpot = new GameObject($"DuoCharacter{i + 1}").transform;
-                charSpot.SetParent(showcaseRoot.transform, false);
-                charSpot.position = kartSpot.position - dir * 0.3f + right * (1.3f * side);
-                Vector3 look = Vector3.ProjectOnPlane(duoCam.position - charSpot.position, Vector3.up);
-                charSpot.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
-                showcase.duoCharacterSpots[i] = charSpot;
             }
 
             var ui = AddUIDocument("MainMenuUI");

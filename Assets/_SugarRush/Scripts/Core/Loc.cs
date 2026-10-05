@@ -92,6 +92,7 @@ namespace SugarRush
             ["opt.quality.1"] = ("Calidad", "Quality"),
             ["opt.laps"] = ("Vueltas", "Laps"),
             ["opt.chaos"] = ("Caos de Ralph", "Ralph's chaos"),
+            ["opt.drivers"] = ("Pilotos en carrera", "Drivers in race"),
             ["opt.on"] = ("Activado", "On"),
             ["opt.off"] = ("Desactivado", "Off"),
 

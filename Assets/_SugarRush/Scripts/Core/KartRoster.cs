@@ -26,6 +26,10 @@ namespace SugarRush
             public GameObject character;
             [Tooltip("2D portrait, shown as a cut-out when there is no 3D character yet.")]
             public Texture2D portrait;
+            [Tooltip("Where the driver's hips go, in the kart's local space.")]
+            public Vector3 seat = new(0f, 0.45f, -0.2f);
+            [Tooltip("Driver size relative to the standing character.")]
+            public float driverScale = 0.7f;
         }
 
         public Entry[] karts;

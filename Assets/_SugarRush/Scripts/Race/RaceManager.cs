@@ -115,6 +115,7 @@ namespace SugarRush
                 go.name = "Kart_" + entry.displayName;
                 var kart = go.GetComponent<KartController>();
                 kart.killY = minY - 30f;
+                if (GameSettings.DriversInRace) CharacterPuppet.CreateStaticDriver(entry, go.transform);
 
                 var progress = go.AddComponent<RaceProgress>();
                 progress.path = path;

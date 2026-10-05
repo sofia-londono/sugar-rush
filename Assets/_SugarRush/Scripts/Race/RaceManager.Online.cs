@@ -148,6 +148,7 @@ namespace SugarRush
             Racers.Add(progress);
 
             if (!go.GetComponent<KartAudio>()) go.AddComponent<KartAudio>();
+            if (GameSettings.DriversInRace) CharacterPuppet.CreateStaticDriver(entry, go.transform);
             RefreshNetKart(net);
         }
 
