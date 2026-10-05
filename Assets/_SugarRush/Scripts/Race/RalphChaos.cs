@@ -18,8 +18,9 @@ namespace SugarRush
         public float roadMin, roadMax;
         [Tooltip("Pre-built rubble, scaled in when the zone breaks.")]
         public Transform rubble;
+        [Tooltip("Where Ralph stands: the outer edge of the rubble, facing the road.")]
         public Vector3 ralphSpot;
-        [Tooltip("Direction Ralph jumps in from (off the track).")]
+        [Tooltip("Outwards from the road on the rubble side (he jumps in from there and faces the other way).")]
         public Vector3 ralphSide;
     }
 
@@ -40,6 +41,8 @@ namespace SugarRush
         public ChaosZone[] zones;
         public Transform[] coins;
         public RalphPuppet ralph;
+        [Tooltip("Sugar dust puffed up by each punch.")]
+        public ParticleSystem dust;
 
         [Header("Rules")]
         public int hammerCost = 5;
@@ -80,6 +83,12 @@ namespace SugarRush
         int showZone = -1;
         float showLandAt;
         int nextHit;
+
+        // Chunks of road flying from each punch.
+        const int ChunkCount = 14;
+        Transform[] chunks;
+        Vector3[] chunkVelocity, chunkSpin;
+        float[] chunkLife;
 
         // Gold coins bursting out of a repair.
         const int BurstCount = 8;
@@ -127,6 +136,23 @@ namespace SugarRush
                 int seg = path.FindClosestSegment(coins[i].position);
                 coinDistance[i] = path.ProjectDistance(coins[i].position, seg);
                 coinLateral[i] = Lateral(coins[i].position, coinDistance[i]);
+            }
+
+            chunks = new Transform[ChunkCount];
+            chunkVelocity = new Vector3[ChunkCount];
+            chunkSpin = new Vector3[ChunkCount];
+            chunkLife = new float[ChunkCount];
+            var rubbleMats = zones.Length > 0 ? zones[0].rubble.GetComponent<Renderer>().sharedMaterials : null;
+            for (int i = 0; i < ChunkCount; i++)
+            {
+                var c = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Destroy(c.GetComponent<Collider>());
+                c.name = "RoadChunk";
+                c.transform.SetParent(transform, false);
+                if (rubbleMats is { Length: > 0 }) c.GetComponent<Renderer>().sharedMaterial = rubbleMats[i % rubbleMats.Length];
+                c.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                c.SetActive(false);
+                chunks[i] = c.transform;
             }
 
             burst = new Transform[BurstCount];
@@ -421,7 +447,7 @@ namespace SugarRush
             showLandAt = Time.time + secondsToLanding;
             nextHit = 0;
             var z = zones[zone];
-            if (ralph) ralph.Play(z.ralphSpot, -path.DirectionAtDistance(z.distance), z.ralphSide, secondsToLanding);
+            if (ralph) ralph.Play(z.ralphSpot, -z.ralphSide, z.ralphSide, secondsToLanding);
             if (Lib) AudioHub.PlayUI(Lib.ralphWarning, 0.9f);
             RalphIncoming?.Invoke(zone);
         }
@@ -435,9 +461,11 @@ namespace SugarRush
             while (nextHit < RalphPuppet.Hits.Length && t >= RalphPuppet.Hits[nextHit])
             {
                 bool first = nextHit == 0;
-                if (Lib) AudioHub.PlayAt(Lib.ralphSmash, spot, first ? 1f : 0.7f, first ? 1f : 1.12f);
+                Vector3 fist = ralph ? ralph.FistTarget(nextHit) : spot;
+                if (Lib) AudioHub.PlayAt(Lib.ralphSmash, fist, first ? 1f : 0.75f, 0.95f + 0.05f * (nextHit % 3));
                 if (first && Lib) AudioHub.PlayUI(Lib.ralphSmash, 0.35f);
-                ShakeCameras(spot, first ? 0.55f : 0.3f, first ? 0.08f : 0.03f);
+                ShakeCameras(fist, first ? 0.5f : 0.32f, first ? 0.07f : 0.03f);
+                if (t - RalphPuppet.Hits[nextHit] < 0.3f) Impact(fist); // skip the debris if we heard late
                 nextHit++;
             }
             if (ralph)
@@ -448,6 +476,40 @@ namespace SugarRush
                 ralph.SetVisible(near);
             }
             if (t > RalphPuppet.EndAt) showZone = -1;
+        }
+
+        /// <summary>A fist hits the road: chunks fly up and sugar dust puffs out.</summary>
+        void Impact(Vector3 at)
+        {
+            if (ralph && !AnyCameraNear(at)) return; // nobody would see it
+            int spawned = 0;
+            for (int i = 0; i < ChunkCount && spawned < 6; i++)
+            {
+                if (chunkLife[i] > 0f) continue;
+                var c = chunks[i];
+                c.gameObject.SetActive(true);
+                c.position = at + Vector3.up * 0.2f;
+                c.localScale = Vector3.one * UnityEngine.Random.Range(0.25f, 0.55f);
+                c.rotation = UnityEngine.Random.rotation;
+                Vector3 outDir = UnityEngine.Random.insideUnitSphere;
+                outDir.y = 0f;
+                chunkVelocity[i] = outDir.normalized * UnityEngine.Random.Range(2f, 5f) + Vector3.up * UnityEngine.Random.Range(5f, 9f);
+                chunkSpin[i] = UnityEngine.Random.insideUnitSphere * 720f;
+                chunkLife[i] = 1.3f;
+                spawned++;
+            }
+            if (dust)
+            {
+                var emit = new ParticleSystem.EmitParams { position = at + Vector3.up * 0.3f, applyShapeToPosition = true };
+                dust.Emit(emit, 16);
+            }
+        }
+
+        bool AnyCameraNear(Vector3 at)
+        {
+            foreach (var cam in LocalCameras())
+                if ((cam.transform.position - at).sqrMagnitude < visibleDistance * visibleDistance) return true;
+            return false;
         }
 
         IEnumerable<KartCamera> LocalCameras()
@@ -482,9 +544,21 @@ namespace SugarRush
                 if (visible) coins[i].localRotation = spin * coinBase[i];
             }
 
+            for (int i = 0; i < ChunkCount; i++)
+            {
+                if (chunkLife[i] <= 0f) continue;
+                chunkLife[i] -= dt;
+                chunkVelocity[i] += Physics.gravity * dt;
+                chunks[i].position += chunkVelocity[i] * dt;
+                chunks[i].Rotate(chunkSpin[i] * dt, Space.World);
+                if (chunkLife[i] <= 0f) chunks[i].gameObject.SetActive(false);
+            }
+
             for (int z = 0; z < zones.Length; z++)
             {
                 float target = broken[z] ? 1f : 0f;
+                // While Ralph is at it, the rubble grows with each punch.
+                if (broken[z] && z == showZone) target = nextHit / (float)RalphPuppet.Hits.Length;
                 float shown = rubbleShown[z];
                 if (Mathf.Approximately(shown, target)) continue;
                 shown = Mathf.MoveTowards(shown, target, dt * (target > shown ? 3.5f : 2.5f));

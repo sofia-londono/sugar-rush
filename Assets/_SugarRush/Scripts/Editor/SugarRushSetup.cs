@@ -1154,7 +1154,11 @@ namespace SugarRush.EditorTools
                     Quaternion.LookRotation(Vector3.ProjectOnPlane(path.DirectionAtDistance(d), hit.normal).normalized, hit.normal));
                 BuildRubbleMesh(rubbleGo, zi, zone.blockedMax - zone.blockedMin, ChaosZoneHalfLength * 2f - 1f, cube, cylinder, chocolate, crack, candies);
                 zone.rubble = rubbleGo.transform;
-                zone.ralphSpot = hit.point;
+                // Ralph stands just past the outer edge of the rubble, facing the road, and pounds it.
+                float standLateral = blockRight ? zone.blockedMax + 0.7f : zone.blockedMin - 0.7f;
+                Vector3 standOnLine = path.PositionAtDistance(d) + rightVec * standLateral;
+                var standHit = GroundHit(standOnLine);
+                zone.ralphSpot = Mathf.Abs(standHit.point.y - standOnLine.y) < 1f ? standHit.point : standOnLine;
                 zone.ralphSide = rightVec * (blockRight ? 1f : -1f);
                 zones.Add(zone);
             }
@@ -1191,9 +1195,73 @@ namespace SugarRush.EditorTools
                 ralph.transform.SetParent(root.transform, false);
                 chaos.ralph = ralph.AddComponent<RalphPuppet>();
                 chaos.ralph.model = ralph.transform.GetChild(0);
+                // A body for karts to bounce off (enabled only while he stands on the road).
+                var capsule = ralph.AddComponent<CapsuleCollider>();
+                capsule.center = new Vector3(0f, 2.2f, 0.3f);
+                capsule.height = 4.4f;
+                capsule.radius = 1.3f;
+                capsule.enabled = false;
+                var body = ralph.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
                 ralph.SetActive(false);
             }
+            chaos.dust = BuildSugarDust(root.transform);
             return $"chaos: {zones.Count} zones, {coinList.Count} coins, ralph={(ralphPrefab ? "yes" : "missing")}";
+        }
+
+        /// <summary>Puffs of sugar dust for Ralph's punches: one small particle system, emitted on demand.</summary>
+        static ParticleSystem BuildSugarDust(Transform parent)
+        {
+            var dot = GetGeneratedTexture("SoftDot", 64, (x, y) =>
+            {
+                float dx = (x + 0.5f) / 32f - 1f, dy = (y + 0.5f) / 32f - 1f;
+                float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy));
+                return new Color(1f, 1f, 1f, a * a);
+            }, transparent: true);
+            var mat = GetMaterial("Chaos/SugarDust", "Universal Render Pipeline/Particles/Unlit", Color.white, dot);
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+
+            var go = new GameObject("SugarDust");
+            go.transform.SetParent(parent, false);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.playOnAwake = false;
+            main.loop = false;
+            main.maxParticles = 80;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.1f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 4f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.6f, 1.6f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 1f, 1f, 0.9f), new Color(1f, 0.85f, 0.93f, 0.9f));
+            main.gravityModifier = -0.05f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Hemisphere;
+            shape.radius = 0.6f;
+            var colour = ps.colorOverLifetime;
+            colour.enabled = true;
+            var fade = new Gradient();
+            fade.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+            colour.color = fade;
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 1.6f));
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = mat;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return ps;
         }
 
         /// <summary>
