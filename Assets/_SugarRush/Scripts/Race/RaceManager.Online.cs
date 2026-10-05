@@ -165,10 +165,12 @@ namespace SugarRush
             var audio = net.GetComponent<KartAudio>();
             if (audio) audio.isPlayer = net.IsMine;
 
-            if (!net.IsMine && Player == progress) Player = null;
+            if (!net.IsMine && Player == progress) { Player = null; LocalPlayers.Remove(progress); }
             if (net.IsMine && Player != progress)
             {
                 Player = progress;
+                LocalPlayers.Clear();
+                LocalPlayers.Add(progress);
                 if (kartCamera)
                 {
                     kartCamera.target = net.Kart;
@@ -226,6 +228,7 @@ namespace SugarRush
                 if (input) Destroy(input);
                 var ai = racer.gameObject.AddComponent<AIKartDriver>();
                 ai.difficulty = new AIDifficulty.Level { speedScale = 0.8f, catchUpBoost = 0f, leadSlowdown = 0f };
+                LocalPlayerFinished?.Invoke(racer);
                 SetState(State.Finished);
             }
         }

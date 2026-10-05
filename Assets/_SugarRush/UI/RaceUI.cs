@@ -1,104 +1,171 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace SugarRush
 {
     /// <summary>
-    /// In-race UI: HUD (position, lap, time, speed), countdown and messages, the
-    /// "back to track" prompt, the pause menu and the results screen — all in the candy style.
+    /// In-race UI: one HUD per local player (position, lap, time, speed, messages, "back to
+    /// track" prompt) — full screen normally, side by side in split screen — plus the shared
+    /// countdown, the pause menu and the results screen, all in the candy style.
     /// </summary>
     public class RaceUI : MonoBehaviour
     {
         public UIDocument document;
 
+        /// <summary>The HUD of one player, laid over their half (or all) of the screen.</summary>
+        class PlayerHud
+        {
+            public RaceProgress Player;
+            public VisualElement Root, Lost;
+            public CandyTitle Position, Total, Speed, Boost, Message, Tag;
+            public Label Lap, Time, LostText;
+            public float MessageUntil;
+            public bool FinalLapAnnounced;
+
+            public void ShowMessage(string text, float seconds, CandyTone tone = CandyTone.Rainbow)
+            {
+                Message.Tone = tone;
+                Message.Text = text;
+                MessageUntil = UnityEngine.Time.unscaledTime + seconds;
+                UIKit.Pop(Message);
+            }
+        }
+
         RaceManager race;
-        VisualElement root, hud, overlay, lost;
-        CandyTitle position, positionTotal, speed, boost, countdown, message;
-        Label lap, time, lostText, pauseHint;
+        VisualElement root, overlay, sharedCenter;
+        CandyTitle countdown;
+        Label pauseHint;
+        readonly List<PlayerHud> huds = new();
         VisualElement resultsRows;
-        float messageUntil;
         float resultsRefresh;
-        bool resultsShown, leaving, finalLapAnnounced;
+        bool resultsShown, leaving;
         int lastCountdown = -1;
+
+        static SoundLibrary Lib => SoundLibrary.Instance;
 
         void Start()
         {
             race = RaceManager.Instance;
             root = document.rootVisualElement;
             root.Clear();
-            BuildHud();
+            BuildShared();
             race.StateChanged += OnStateChanged;
             race.RacerLapCompleted += OnLapCompleted;
+            race.LocalPlayerFinished += OnLocalPlayerFinished;
             UIKit.FadeIn(root);
             if (Lib) AudioHub.PlayMusic(Lib.raceMusic);
         }
-
-        static SoundLibrary Lib => SoundLibrary.Instance;
 
         void OnDestroy()
         {
             if (!race) return;
             race.StateChanged -= OnStateChanged;
             race.RacerLapCompleted -= OnLapCompleted;
+            race.LocalPlayerFinished -= OnLocalPlayerFinished;
         }
 
         // ------------------------------------------------------------ HUD
 
-        void BuildHud()
+        void BuildShared()
         {
-            hud = UIKit.Div("hud");
+            sharedCenter = UIKit.Div("hud-center");
+            sharedCenter.pickingMode = PickingMode.Ignore;
+            countdown = UIKit.Title("", CandyTone.Rainbow, "candy-title--xxl");
+            sharedCenter.Add(countdown);
+            root.Add(sharedCenter);
+
+            var hint = UIKit.Div("hud-corner", "hud-corner--bottom-left");
+            hint.pickingMode = PickingMode.Ignore;
+            pauseHint = UIKit.Label(Loc.T("hud.pauseHint"), "small-text");
+            hint.Add(pauseHint);
+            root.Add(hint);
+        }
+
+        /// <summary>Creates one HUD per local player once they exist (online karts arrive late).</summary>
+        void EnsureHuds()
+        {
+            if (huds.Count == race.LocalPlayers.Count && (huds.Count == 0 || huds[0].Player == race.LocalPlayers[0])) return;
+            foreach (var h in huds) h.Root.RemoveFromHierarchy();
+            huds.Clear();
+
+            bool split = race.LocalPlayers.Count > 1;
+            for (int i = 0; i < race.LocalPlayers.Count; i++)
+            {
+                var hud = BuildHud(race.LocalPlayers[i], split, i);
+                huds.Add(hud);
+                root.Insert(0, hud.Root); // under the shared countdown and menus
+            }
+            if (split && root.Q(className: "split-divider") == null)
+            {
+                var divider = UIKit.Div("split-divider");
+                divider.pickingMode = PickingMode.Ignore;
+                root.Insert(huds.Count, divider);
+            }
+        }
+
+        PlayerHud BuildHud(RaceProgress player, bool split, int index)
+        {
+            var h = new PlayerHud { Player = player };
+            h.Root = UIKit.Div("hud");
+            if (split) h.Root.AddToClassList(index == 0 ? "hud--left" : "hud--right");
+
+            string big = split ? "candy-title--lg" : "candy-title--xl";
+            string mid = split ? "candy-title--md" : "candy-title--lg";
 
             var topLeft = UIKit.Div("hud-corner", "hud-corner--top-left");
+            if (split)
+            {
+                h.Tag = UIKit.Title(Loc.T("lobby.short", index + 1), index == 0 ? CandyTone.Pink : CandyTone.Sky, "candy-title--sm");
+                topLeft.Add(h.Tag);
+            }
             var posRow = UIKit.Div("hud-row");
-            position = UIKit.Title("", CandyTone.Pink, "candy-title--xl");
-            positionTotal = UIKit.Title("", CandyTone.Lavender, "candy-title--sm");
-            positionTotal.AddToClassList("hud-total");
-            posRow.Add(position);
-            posRow.Add(positionTotal);
+            h.Position = UIKit.Title("", CandyTone.Pink, big);
+            h.Total = UIKit.Title("", CandyTone.Lavender, "candy-title--sm");
+            h.Total.AddToClassList("hud-total");
+            posRow.Add(h.Position);
+            posRow.Add(h.Total);
             topLeft.Add(posRow);
-            hud.Add(topLeft);
+            h.Root.Add(topLeft);
 
             var topRight = UIKit.Div("hud-corner", "hud-corner--top-right");
-            lap = UIKit.Chip(topRight, "", "candy-chip--lap");
-            time = UIKit.Chip(topRight, "", "candy-chip--time");
-            hud.Add(topRight);
+            h.Lap = UIKit.Chip(topRight, "", "candy-chip--lap");
+            h.Time = UIKit.Chip(topRight, "", "candy-chip--time");
+            h.Root.Add(topRight);
 
             var bottomRight = UIKit.Div("hud-corner", "hud-corner--bottom-right");
-            boost = UIKit.Title("¡TURBO!", CandyTone.Lemon, "candy-title--sm");
+            h.Boost = UIKit.Title("¡TURBO!", CandyTone.Lemon, "candy-title--sm");
             var speedRow = UIKit.Div("hud-row");
-            speed = UIKit.Title("0", CandyTone.Sky, "candy-title--lg");
-            speed.AddToClassList("hud-speed");
-            speedRow.Add(speed);
+            h.Speed = UIKit.Title("0", CandyTone.Sky, mid);
+            h.Speed.AddToClassList("hud-speed");
+            speedRow.Add(h.Speed);
             speedRow.Add(UIKit.Label("km/h", "hud-unit"));
-            bottomRight.Add(boost);
+            bottomRight.Add(h.Boost);
             bottomRight.Add(speedRow);
-            hud.Add(bottomRight);
+            h.Root.Add(bottomRight);
 
-            var bottomLeft = UIKit.Div("hud-corner", "hud-corner--bottom-left");
-            pauseHint = UIKit.Label(Loc.T("hud.pauseHint"), "small-text");
-            bottomLeft.Add(pauseHint);
-            hud.Add(bottomLeft);
+            var center = UIKit.Div("hud-center", "hud-center--player");
+            h.Message = UIKit.Title("", CandyTone.Rainbow, split ? "candy-title--md" : "candy-title--lg");
+            h.Lost = new FrostingPanel(CandyTone.Mint, 23 + index);
+            h.Lost.AddToClassList("frosting-panel--compact");
+            h.Lost.AddToClassList("hud-lost");
+            h.LostText = UIKit.Label("", "hud-lost__text");
+            h.Lost.Add(h.LostText);
+            center.Add(h.Message);
+            center.Add(h.Lost);
+            h.Root.Add(center);
 
-            var center = UIKit.Div("hud-center");
-            countdown = UIKit.Title("", CandyTone.Rainbow, "candy-title--xxl");
-            message = UIKit.Title("", CandyTone.Rainbow, "candy-title--lg");
-            lost = new FrostingPanel(CandyTone.Mint, 23);
-            lost.AddToClassList("frosting-panel--compact");
-            lost.AddToClassList("hud-lost");
-            lostText = UIKit.Label("", "hud-lost__text");
-            lost.Add(lostText);
-            center.Add(countdown);
-            center.Add(message);
-            center.Add(lost);
-            hud.Add(center);
-
-            foreach (var e in hud.Query<VisualElement>().ToList()) e.pickingMode = PickingMode.Ignore;
-            root.Add(hud);
+            foreach (var e in h.Root.Query<VisualElement>().ToList()) e.pickingMode = PickingMode.Ignore;
+            h.Root.pickingMode = PickingMode.Ignore;
+            return h;
         }
 
         void Update()
         {
-            if (!race || !race.Player) return;
+            if (!race) return;
+            EnsureHuds();
+            RefreshCountdown();
+            if (huds.Count == 0) return;
 
             if (UIKit.PausePressed() && !resultsShown && !leaving)
             {
@@ -106,7 +173,8 @@ namespace SugarRush
                 SetPaused(!race.IsPaused);
             }
 
-            RefreshHud();
+            foreach (var h in huds) RefreshHud(h);
+            pauseHint.EnableInClassList("hidden", resultsShown);
 
             if (resultsShown)
             {
@@ -115,56 +183,50 @@ namespace SugarRush
             }
         }
 
-        void RefreshHud()
+        void RefreshCountdown()
         {
-            var player = race.Player;
-            position.Text = Loc.Ordinal(player.Position);
-            positionTotal.Text = "/" + race.Racers.Count;
-            lap.text = Loc.T("hud.lap", Mathf.Clamp(player.CompletedLaps + 1, 1, race.Laps), race.Laps);
-            time.text = Loc.Time(player.Finished ? player.FinishTime : race.RaceTime);
-            speed.Text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
-            boost.EnableInClassList("hidden", !player.Kart.IsBoosting);
-
-            bool counting = race.CurrentState == RaceManager.State.Countdown;
+            bool counting = race.CurrentState == RaceManager.State.Countdown && race.Countdown > 0 && huds.Count > 0;
             countdown.EnableInClassList("hidden", !counting);
-            if (counting && race.Countdown != lastCountdown)
-            {
-                lastCountdown = race.Countdown;
-                countdown.Text = race.Countdown.ToString();
-                UIKit.Pop(countdown);
-                if (Lib) AudioHub.PlayUI(Lib.countdownBeep, 0.8f);
-            }
+            if (!counting || race.Countdown == lastCountdown) return;
+            lastCountdown = race.Countdown;
+            countdown.Text = race.Countdown.ToString();
+            UIKit.Pop(countdown);
+            if (Lib) AudioHub.PlayUI(Lib.countdownBeep, 0.8f);
+        }
+
+        void RefreshHud(PlayerHud h)
+        {
+            var player = h.Player;
+            if (!player) return;
+            h.Position.Text = Loc.Ordinal(player.Position);
+            h.Total.Text = "/" + race.Racers.Count;
+            h.Lap.text = Loc.T("hud.lap", Mathf.Clamp(player.CompletedLaps + 1, 1, race.Laps), race.Laps);
+            h.Time.text = Loc.Time(player.Finished ? player.FinishTime : race.RaceTime);
+            h.Speed.Text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
+            h.Boost.EnableInClassList("hidden", !player.Kart.IsBoosting);
 
             // Priority: wrong way warning, then timed messages.
             bool wrongWay = player.WrongWay && !player.Finished;
             if (wrongWay)
             {
-                message.Text = Loc.T("hud.wrongWay");
-                message.Tone = CandyTone.Lemon;
+                h.Message.Text = Loc.T("hud.wrongWay");
+                h.Message.Tone = CandyTone.Lemon;
             }
-            message.EnableInClassList("hidden", !wrongWay && Time.unscaledTime > messageUntil);
+            h.Message.EnableInClassList("hidden", !wrongWay && Time.unscaledTime > h.MessageUntil);
 
             bool showLost = player.NeedsHelp && !player.Finished && !race.IsPaused;
-            lost.EnableInClassList("hidden", !showLost);
+            h.Lost.EnableInClassList("hidden", !showLost);
             if (showLost)
-                lostText.text = Loc.T("hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
-
-            pauseHint.EnableInClassList("hidden", resultsShown);
+                h.LostText.text = Loc.T("hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
         }
 
-        void ShowMessage(string text, float seconds = 1.6f)
-        {
-            message.Tone = CandyTone.Rainbow;
-            message.Text = text;
-            messageUntil = Time.unscaledTime + seconds;
-            UIKit.Pop(message);
-        }
+        PlayerHud HudOf(RaceProgress racer) => huds.Find(h => h.Player == racer);
 
         void OnStateChanged(RaceManager.State state)
         {
             if (state == RaceManager.State.Racing)
             {
-                ShowMessage(Loc.T("hud.go"), 1.2f);
+                foreach (var h in huds) h.ShowMessage(Loc.T("hud.go"), 1.2f);
                 if (Lib) AudioHub.PlayUI(Lib.countdownGo, 0.9f);
             }
             if (state == RaceManager.State.Finished)
@@ -176,14 +238,24 @@ namespace SugarRush
 
         void OnLapCompleted(RaceProgress racer)
         {
-            if (!racer.isPlayer || racer.Finished) return;
+            var h = HudOf(racer);
+            if (h == null || racer.Finished) return;
             if (Lib) AudioHub.PlayUI(Lib.lapChime, 0.8f, racer.CompletedLaps == race.Laps - 1 ? 1.2f : 1f);
-            if (racer.CompletedLaps == race.Laps - 1 && !finalLapAnnounced)
+            if (racer.CompletedLaps == race.Laps - 1 && !h.FinalLapAnnounced)
             {
-                finalLapAnnounced = true;
-                ShowMessage(Loc.T("hud.finalLap"), 2.2f);
+                h.FinalLapAnnounced = true;
+                h.ShowMessage(Loc.T("hud.finalLap"), 2.2f);
             }
-            else ShowMessage(Loc.T("hud.lapTime", racer.CompletedLaps, Loc.Time(racer.LastLap)), 2f);
+            else h.ShowMessage(Loc.T("hud.lapTime", racer.CompletedLaps, Loc.Time(racer.LastLap)), 2f);
+        }
+
+        /// <summary>Split screen: the first player to finish sees their place while the other races on.</summary>
+        void OnLocalPlayerFinished(RaceProgress racer)
+        {
+            var h = HudOf(racer);
+            if (h == null || huds.Count < 2) return;
+            h.ShowMessage(Loc.T("hud.finished", Loc.Ordinal(racer.Position)), 999f);
+            if (Lib) AudioHub.PlayUI(Lib.lapChime, 0.9f, 1.3f);
         }
 
         // ------------------------------------------------------------ Pause
@@ -237,19 +309,31 @@ namespace SugarRush
         {
             CloseOverlay();
             resultsShown = true;
-            var player = race.Player;
+            foreach (var h in huds) h.Message.AddToClassList("hidden");
 
             overlay = UIKit.Div("screen", "screen--dim");
             overlay.Add(new SprinkleRain(60));
             var panel = new FrostingPanel(CandyTone.Pink, 47);
             panel.AddToClassList("frosting-panel--wide");
             panel.Add(UIKit.Title(Loc.T("results.title"), CandyTone.Pink, "candy-title--md"));
-            panel.Add(UIKit.Title(Loc.Ordinal(player.Position), CandyTone.Lavender, "candy-title--lg"));
+
+            // One place per local player ("J1 2º  ·  J2 4º" in split screen).
+            var places = UIKit.Div("row");
+            for (int i = 0; i < race.LocalPlayers.Count; i++)
+            {
+                var p = race.LocalPlayers[i];
+                string text = race.LocalPlayers.Count > 1 ? $"{Loc.T("lobby.short", i + 1)} {Loc.Ordinal(p.Position)}" : Loc.Ordinal(p.Position);
+                var place = UIKit.Title(text, i == 0 ? CandyTone.Lavender : CandyTone.Sky, "candy-title--lg");
+                place.AddToClassList("results-place");
+                places.Add(place);
+            }
+            panel.Add(places);
             if (race.NewRecord) panel.Add(UIKit.Label(Loc.T("results.newRecord"), "results-highlight"));
 
             resultsRows = UIKit.Div();
             panel.Add(resultsRows);
-            panel.Add(UIKit.Label(Loc.T("results.bestLap", Loc.Time(player.BestLap)), "results-highlight"));
+            if (race.Player)
+                panel.Add(UIKit.Label(Loc.T("results.bestLap", Loc.Time(BestLocalLap())), "results-highlight"));
 
             var buttons = UIKit.Div("row");
             Button again;
@@ -271,6 +355,14 @@ namespace SugarRush
             UIKit.Enter(root, overlay);
             RefreshResults();
             UIKit.FocusLater(again);
+        }
+
+        float BestLocalLap()
+        {
+            float best = 0f;
+            foreach (var p in race.LocalPlayers)
+                if (p.BestLap > 0f && (best <= 0f || p.BestLap < best)) best = p.BestLap;
+            return best;
         }
 
         void RefreshResults()

@@ -403,6 +403,16 @@
     text-shadow: 0 2px 0 rgba(255, 255, 255, 0.6);
 }
 
+.candy-button--pink-light {
+    background-color: #FFA3CF;
+}
+
+/* Main menu column: six buttons have to fit under the title. */
+.candy-button--menu {
+    height: 88px;
+    margin: 7px 0;
+}
+
 .candy-button--small {
     width: 380px;
     height: 84px;
@@ -760,6 +770,75 @@
 
 .lobby-pick__name {
     min-width: 440px;
+}
+
+/* ---------- Split screen ---------- */
+
+.hud--left {
+    right: 50%;
+}
+
+.hud--right {
+    left: 50%;
+}
+
+.hud-center--player {
+    top: 36%;
+}
+
+.split-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 8px;
+    margin-left: -4px;
+    background-color: #FFFFFF;
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-color: var(--pink);
+}
+
+.local-slots {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.local-slot {
+    width: 640px;
+    margin: 0 18px;
+    min-height: 470px;
+}
+
+.local-slot__device {
+    font-size: 32px;
+    color: var(--lavender-dark);
+    -unity-text-align: middle-center;
+    margin-bottom: 6px;
+}
+
+.local-slot__status {
+    font-size: 40px;
+    color: var(--mint-dark);
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+    -unity-text-align: middle-center;
+    margin-top: 14px;
+}
+
+.local-slot__waiting {
+    font-size: 38px;
+    color: var(--choco);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    margin-top: 70px;
+}
+
+.local-slot--ready {
+    scale: 1.03 1.03;
+}
+
+.results-place {
+    margin: 0 24px;
 }
 
 /* ---------- Results ---------- */

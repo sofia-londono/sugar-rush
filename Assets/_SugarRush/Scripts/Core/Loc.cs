@@ -48,6 +48,18 @@ namespace SugarRush
             ["lobby.aiFill"] = ("Los puestos libres los corre la IA", "Empty spots are raced by the AI"),
             ["lobby.backToRoom"] = ("Volver a la sala", "Back to room"),
 
+            // Local split screen
+            ["menu.local"] = ("Local (2 jugadores)", "Local (2 players)"),
+            ["local.title"] = ("2 jugadores", "2 players"),
+            ["local.join"] = ("Presiona A en tu control\no Enter en el teclado para unirte", "Press A on your gamepad\nor Enter on the keyboard to join"),
+            ["local.keyboard"] = ("Teclado", "Keyboard"),
+            ["local.gamepad"] = ("Control {0}", "Gamepad {0}"),
+            ["local.ready"] = ("¡Listo!", "Ready!"),
+            ["local.choose"] = ("Elige y confirma", "Choose and confirm"),
+            ["local.hint"] = ("← → corredor  ·  A / Enter: listo  ·  B / Esc: atrás", "← → racer  ·  A / Enter: ready  ·  B / Esc: back"),
+            ["local.pressButton"] = ("¿No aparece tu control? Presiona cualquier botón en él", "Gamepad not showing? Press any button on it"),
+            ["hud.finished"] = ("¡Meta! {0}", "Finish! {0}"),
+
             // Characters
             ["char.title"] = ("Elige tu corredor", "Choose your racer"),
             ["char.speed"] = ("Velocidad", "Speed"),

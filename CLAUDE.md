@@ -57,6 +57,14 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
 - Pendiente: multijugador fase 3 (WebGL + controles táctiles con aceleración automática), iluminación baked.
 
+## Pantalla dividida local (etapa A)
+- Menú "Local (2 jugadores)" (oculto en celulares: `RaceSetup.SplitScreenAvailable`). Cada asiento se toma con A (control) o Enter (teclado); ← → elige corredor (sin repetir), A/Enter = listo, B/Esc = atrás. Al estar los dos listos arranca la carrera.
+- `RaceSetup` (estático) guarda el modo (`Single` / `LocalSplit`) y por jugador el kart y sus dispositivos; `PlayerKartInput.devices` limita cada kart a su teclado o control (vacío = cualquiera, como en un jugador). "Jugar" vuelve a `Single`.
+- `RaceManager.LocalPlayers`: 1 normalmente, 2 en dividida (la IA llena el resto). La carrera termina para la máquina cuando todos los locales cruzan la meta; el récord solo cuenta en un jugador.
+- `RaceManager.Split.cs`: segunda cámara (sin AudioListener: se escucha desde la del J1), vistas lado a lado, FOV 74, y ahorro automático: render scale 0,7, sombras de pista apagadas (los karts sí proyectan), distancia de dibujado 320 m con neblina pastel, sombras a 35 m, límite 30 FPS sin vsync. Todo se restaura en `OnDestroy` (el asset de URP es compartido; verificar renderScale = 1 después de probar).
+- `RaceUI`: un HUD por jugador local (`PlayerHud`), cuenta regresiva compartida al centro, separador, resultados con "J1 2º · J2 4º".
+- Medir FPS reales: copia de Windows con `-sr-sp-test` / `-sr-local-test` (+ `-sr-uncapped`), loguea "[SR] fps" cada 10 s durante 60 s y se cierra.
+
 ## Multijugador en línea
 - Paquetes: Netcode for GameObjects 2.13.3, Multiplayer Services 2.3.3 (API de "sessions" = Lobby + Relay), Multiplayer Play Mode 2.0.2. Proyecto UGS vinculado: `cd38f69e-af4e-4ba7-85b2-941ae4f89294` (en el dashboard se llama "My project"); Relay y Lobby activos.
 - Modelo anfitrión-cliente: quien crea la sala es host. Cada jugador simula SU kart (física local, respuesta inmediata) y lo envía ~20 veces/s (`NetKart.State`, NetworkVariable con escritura del dueño, ~46 bytes). Los demás karts son "proxies" kinemáticos (`KartController.SetProxy`) que interpolan 0,12 s en el pasado y extrapolan hasta 0,25 s. La IA vive en el host (dueño = servidor).

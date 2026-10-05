@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
@@ -10,7 +12,7 @@ namespace SugarRush
     /// </summary>
     public class MainMenuUI : MonoBehaviour
     {
-        enum Page { Main, Characters, Options, Online, Lobby }
+        enum Page { Main, Characters, Options, Online, Lobby, Local }
 
         public UIDocument document;
         public KartRoster roster;
@@ -50,6 +52,7 @@ namespace SugarRush
         {
             if (leaving) return;
             if (page == Page.Lobby) UpdateLobby();
+            if (page == Page.Local) { UpdateLocal(); return; }
             if (page != Page.Main && UIKit.BackPressed() && !connecting && !(codeField != null && codeField.focusController?.focusedElement == codeField))
             {
                 AudioHub.UIBack();
@@ -75,6 +78,7 @@ namespace SugarRush
                 Page.Options => BuildOptions(),
                 Page.Online => BuildOnline(),
                 Page.Lobby => BuildLobby(),
+                Page.Local => BuildLocal(),
                 _ => BuildMain(),
             };
             UIKit.ShowScreen(root, screen);
@@ -92,13 +96,15 @@ namespace SugarRush
             column.Add(UIKit.Title("Sugar Rush", CandyTone.Rainbow, "candy-title--xl"));
             column.Add(UIKit.Label(Loc.T("menu.subtitle"), "subtitle"));
 
-            var play = UIKit.Button(Loc.T("menu.play"), Play);
+            var play = UIKit.Button(Loc.T("menu.play"), Play, "candy-button--menu");
             column.Add(play);
-            column.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky"));
-            column.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint"));
-            column.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender"));
+            column.Add(UIKit.Button(Loc.T("menu.online"), () => ShowPage(Page.Online), "candy-button--sky", "candy-button--menu"));
+            if (RaceSetup.SplitScreenAvailable)
+                column.Add(UIKit.Button(Loc.T("menu.local"), () => ShowPage(Page.Local), "candy-button--pink-light", "candy-button--menu"));
+            column.Add(UIKit.Button(Loc.T("menu.characters"), () => ShowPage(Page.Characters), "candy-button--mint", "candy-button--menu"));
+            column.Add(UIKit.Button(Loc.T("menu.options"), () => ShowPage(Page.Options), "candy-button--lavender", "candy-button--menu"));
 #if !UNITY_WEBGL
-            column.Add(UIKit.Button(Loc.T("menu.quit"), Quit, "candy-button--lemon"));
+            column.Add(UIKit.Button(Loc.T("menu.quit"), Quit, "candy-button--lemon", "candy-button--menu"));
 #endif
 
             float best = GameSettings.GetBestTime(GameSettings.Laps);
@@ -122,6 +128,193 @@ namespace SugarRush
             leaving = true;
             AudioHub.UIConfirm();
             GameSettings.Save();
+            RaceSetup.SetSingle();
+            UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
+        }
+
+        // ------------------------------------------------------------ Local split screen
+
+        /// <summary>One of the two seats: which device joined it, its racer and whether it's ready.</summary>
+        class LocalSlot
+        {
+            public InputDevice Device;
+            public int Kart;
+            public bool Ready;
+            public VisualElement Panel, Body;
+            public CandyTitle Name;
+            public Label DeviceLabel, Status;
+        }
+
+        readonly LocalSlot[] localSlots = { new(), new() };
+
+        VisualElement BuildLocal()
+        {
+            foreach (var slot in localSlots) { slot.Device = null; slot.Ready = false; }
+
+            var screen = UIKit.Div("screen");
+            screen.Add(UIKit.Title(Loc.T("local.title"), CandyTone.Rainbow, "candy-title--lg"));
+
+            var row = UIKit.Div("local-slots");
+            for (int i = 0; i < localSlots.Length; i++)
+            {
+                var slot = localSlots[i];
+                slot.Panel = new FrostingPanel(i == 0 ? CandyTone.Pink : CandyTone.Sky, 61 + i);
+                slot.Panel.AddToClassList("local-slot");
+                slot.Panel.Add(UIKit.Title(Loc.T("lobby.short", i + 1), i == 0 ? CandyTone.Pink : CandyTone.Sky, "candy-title--md"));
+                slot.Body = UIKit.Div("menu-column");
+                slot.Panel.Add(slot.Body);
+                row.Add(slot.Panel);
+                RefreshLocalSlot(i);
+            }
+            screen.Add(row);
+
+            screen.Add(UIKit.Label(Loc.T("local.hint"), "small-text"));
+            screen.Add(UIKit.Label(Loc.T("local.pressButton"), "small-text"));
+            // Not focusable: the A / Enter presses on this page belong to the players' seats.
+            var back = UIKit.BackButton(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small");
+            back.focusable = false;
+            screen.Add(back);
+            root.focusController?.focusedElement?.Blur();
+            return screen;
+        }
+
+        void RefreshLocalSlot(int index)
+        {
+            var slot = localSlots[index];
+            slot.Body.Clear();
+            slot.Panel.EnableInClassList("local-slot--ready", slot.Ready);
+            if (slot.Device == null)
+            {
+                slot.Body.Add(UIKit.Label(Loc.T("local.join"), "local-slot__waiting"));
+                return;
+            }
+            slot.DeviceLabel = UIKit.Label(DeviceName(slot.Device), "local-slot__device");
+            slot.Body.Add(slot.DeviceLabel);
+            var nameRow = UIKit.Div("row");
+            nameRow.Add(UIKit.ArrowButton("‹", () => CycleLocal(index, -1), small: true));
+            // First name only: two seats side by side leave little room ("Adorabeezle Winterpop" won't fit).
+            slot.Name = UIKit.Title(roster.Get(slot.Kart).displayName.Split(' ')[0], index == 0 ? CandyTone.Pink : CandyTone.Sky, "candy-title--sm");
+            slot.Name.AddToClassList("lobby-pick__name");
+            nameRow.Add(slot.Name);
+            nameRow.Add(UIKit.ArrowButton("›", () => CycleLocal(index, 1), small: true));
+            slot.Body.Add(nameRow);
+            slot.Status = UIKit.Label(Loc.T(slot.Ready ? "local.ready" : "local.choose"), "local-slot__status");
+            slot.Body.Add(slot.Status);
+        }
+
+        static string DeviceName(InputDevice device)
+        {
+            if (device is Keyboard) return Loc.T("local.keyboard");
+            int n = 1;
+            foreach (var pad in Gamepad.all) { if (pad == device) break; n++; }
+            return Loc.T("local.gamepad", n);
+        }
+
+        bool KartTakenByOther(int kart, int slotIndex)
+        {
+            var other = localSlots[1 - slotIndex];
+            return other.Device != null && other.Kart == kart;
+        }
+
+        void CycleLocal(int index, int dir)
+        {
+            var slot = localSlots[index];
+            if (slot.Device == null || slot.Ready) return;
+            int count = roster.karts.Length;
+            for (int step = 1; step <= count; step++)
+            {
+                int k = ((slot.Kart + dir * step) % count + count) % count;
+                if (KartTakenByOther(k, index)) continue;
+                slot.Kart = k;
+                break;
+            }
+            AudioHub.UIMove();
+            showcase.Show(slot.Kart);
+            RefreshLocalSlot(index);
+            UIKit.Pop(slot.Name);
+        }
+
+        /// <summary>Reads every keyboard / gamepad: join, pick, ready up, back out.</summary>
+        void UpdateLocal()
+        {
+            var devices = new List<InputDevice>();
+            if (Keyboard.current != null) devices.Add(Keyboard.current);
+            devices.AddRange(Gamepad.all);
+
+            foreach (var device in devices)
+            {
+                int index = System.Array.FindIndex(localSlots, s => s.Device == device);
+                bool confirm = device is Keyboard kb ? kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame
+                    : device is Gamepad gp && (gp.buttonSouth.wasPressedThisFrame || gp.startButton.wasPressedThisFrame);
+                bool back = device is Keyboard kb2 ? kb2.escapeKey.wasPressedThisFrame || kb2.backspaceKey.wasPressedThisFrame
+                    : device is Gamepad gp2 && gp2.buttonEast.wasPressedThisFrame;
+                int dir = 0;
+                if (device is Keyboard k3)
+                {
+                    if (k3.leftArrowKey.wasPressedThisFrame || k3.aKey.wasPressedThisFrame) dir--;
+                    if (k3.rightArrowKey.wasPressedThisFrame || k3.dKey.wasPressedThisFrame) dir++;
+                }
+                else if (device is Gamepad g3)
+                {
+                    if (g3.dpad.left.wasPressedThisFrame || g3.leftStick.left.wasPressedThisFrame) dir--;
+                    if (g3.dpad.right.wasPressedThisFrame || g3.leftStick.right.wasPressedThisFrame) dir++;
+                }
+
+                if (index < 0)
+                {
+                    // Not seated yet: A / Enter takes the first free seat; Esc / B leaves the page.
+                    if (back && System.Array.TrueForAll(localSlots, s => s.Device == null)) { AudioHub.UIBack(); ShowPage(Page.Main); return; }
+                    if (!confirm) continue;
+                    int free = System.Array.FindIndex(localSlots, s => s.Device == null);
+                    if (free < 0) continue;
+                    var slot = localSlots[free];
+                    slot.Device = device;
+                    slot.Kart = free == 0 ? GameSettings.SelectedKart : 0;
+                    if (KartTakenByOther(slot.Kart, free)) CycleLocalSilently(free);
+                    AudioHub.UIConfirm();
+                    showcase.Show(slot.Kart);
+                    RefreshLocalSlot(free);
+                    continue;
+                }
+
+                var seat = localSlots[index];
+                if (dir != 0) CycleLocal(index, dir);
+                if (confirm && !seat.Ready)
+                {
+                    seat.Ready = true;
+                    AudioHub.UIConfirm();
+                    RefreshLocalSlot(index);
+                    UIKit.Pop(seat.Status);
+                    if (System.Array.TrueForAll(localSlots, s => s.Ready)) { StartLocalRace(); return; }
+                }
+                else if (back)
+                {
+                    AudioHub.UIBack();
+                    if (seat.Ready) seat.Ready = false;
+                    else seat.Device = null;
+                    RefreshLocalSlot(index);
+                }
+            }
+        }
+
+        void CycleLocalSilently(int index)
+        {
+            int count = roster.karts.Length;
+            var slot = localSlots[index];
+            for (int k = 0; k < count; k++)
+                if (!KartTakenByOther(k, index)) { slot.Kart = k; return; }
+        }
+
+        void StartLocalRace()
+        {
+            if (leaving) return;
+            leaving = true;
+            GameSettings.SelectedKart = localSlots[0].Kart;
+            GameSettings.Save();
+            var players = new List<RaceSetup.LocalPlayer>();
+            foreach (var slot in localSlots)
+                players.Add(new RaceSetup.LocalPlayer { Kart = slot.Kart, Devices = new[] { slot.Device } });
+            RaceSetup.SetLocalSplit(players);
             UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
         }
 

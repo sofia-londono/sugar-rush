@@ -34,11 +34,15 @@ namespace SugarRush
         public int Laps { get; private set; }
         public bool IsPaused { get; private set; }
         public bool NewRecord { get; private set; }
+        /// <summary>This machine's (first) player.</summary>
         public RaceProgress Player { get; private set; }
+        /// <summary>Everyone playing on this machine: one normally, two in split screen.</summary>
+        public readonly List<RaceProgress> LocalPlayers = new();
         public readonly List<RaceProgress> Racers = new();
 
         public event System.Action<State> StateChanged;
         public event System.Action<RaceProgress> RacerLapCompleted;
+        public event System.Action<RaceProgress> LocalPlayerFinished;
 
         int finishedCount;
 
@@ -58,6 +62,7 @@ namespace SugarRush
         {
             if (Instance == this) Instance = null;
             Time.timeScale = 1f;
+            RestoreSplitScreen();
         }
 
         void Start()
@@ -81,11 +86,17 @@ namespace SugarRush
 
         void SpawnRacers()
         {
-            int playerIndex = Mathf.Clamp(GameSettings.SelectedKart, 0, roster.karts.Length - 1);
-            // The player starts at the back of the grid; rivals fill the slots ahead.
+            // People on this machine: one, or two in split screen (each with their own devices).
+            var humans = new List<RaceSetup.LocalPlayer>();
+            if (RaceSetup.IsSplitScreen) humans.AddRange(RaceSetup.LocalPlayers);
+            else humans.Add(new RaceSetup.LocalPlayer { Kart = Mathf.Clamp(GameSettings.SelectedKart, 0, roster.karts.Length - 1) });
+
+            // Players start at the back of the grid; rivals fill the slots ahead.
             var order = new List<int>();
-            for (int i = 0; i < roster.karts.Length; i++) if (i != playerIndex) order.Add(i);
-            order.Add(playerIndex);
+            var humanKarts = new List<int>();
+            foreach (var h in humans) humanKarts.Add(h.Kart);
+            for (int i = 0; i < roster.karts.Length; i++) if (!humanKarts.Contains(i)) order.Add(i);
+            order.AddRange(humanKarts);
 
             float minY = float.MaxValue;
             foreach (var p in path.points) minY = Mathf.Min(minY, p.y);
@@ -108,15 +119,17 @@ namespace SugarRush
                 var progress = go.AddComponent<RaceProgress>();
                 progress.path = path;
                 progress.racerName = entry.displayName;
-                progress.isPlayer = order[slot] == playerIndex;
+                int humanIndex = slot - (order.Count - humans.Count);
+                progress.isPlayer = humanIndex >= 0;
                 progress.isHuman = progress.isPlayer;
                 progress.LapCompleted += OnLapCompleted;
                 Racers.Add(progress);
 
                 if (progress.isPlayer)
                 {
-                    go.AddComponent<PlayerKartInput>();
-                    Player = progress;
+                    go.AddComponent<PlayerKartInput>().devices = humans[humanIndex].Devices;
+                    LocalPlayers.Add(progress);
+                    if (!Player) Player = progress;
                 }
                 else
                 {
@@ -133,6 +146,7 @@ namespace SugarRush
                 kartCamera.target = Player.Kart;
                 kartCamera.SnapToTarget();
             }
+            if (LocalPlayers.Count > 1) SetupSplitScreen();
             UpdatePositions();
         }
 
@@ -191,12 +205,15 @@ namespace SugarRush
 
             if (racer.isPlayer)
             {
-                NewRecord = GameSettings.TrySetBestTime(Laps, RaceTime);
+                // Records only count in a normal single-player race.
+                if (LocalPlayers.Count == 1) NewRecord = GameSettings.TrySetBestTime(Laps, RaceTime);
                 // Let the computer drive the player's kart for the victory lap.
                 racer.GetComponent<PlayerKartInput>().enabled = false;
                 var ai = racer.gameObject.AddComponent<AIKartDriver>();
                 ai.difficulty = new AIDifficulty.Level { speedScale = 0.8f, catchUpBoost = 0f, leadSlowdown = 0f };
-                SetState(State.Finished);
+                LocalPlayerFinished?.Invoke(racer);
+                // The race is over for this machine once every local player has crossed the line.
+                if (LocalPlayers.TrueForAll(p => p.Finished)) SetState(State.Finished);
             }
         }
 
@@ -223,7 +240,10 @@ namespace SugarRush
         public void PlayerBackToTrack()
         {
             SetPaused(false);
-            if (Player && !Player.Finished) Player.ReturnToTrack();
+            // Split screen: rescue whoever is lost; otherwise the (first) player.
+            var lost = LocalPlayers.FindAll(p => p.NeedsHelp && !p.Finished);
+            if (lost.Count == 0 && Player && !Player.Finished) lost.Add(Player);
+            foreach (var p in lost) p.ReturnToTrack();
         }
 
         public void Restart()

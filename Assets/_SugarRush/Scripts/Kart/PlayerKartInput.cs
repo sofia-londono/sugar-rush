@@ -18,9 +18,19 @@ namespace SugarRush
         [Tooltip("Gamepad stick response: 1 = linear, 2 = gentle near the centre.")]
         public float stickCurve = 1.8f;
 
+        [Tooltip("Split screen: the only devices this player reads. Empty/null = any keyboard and the last used gamepad.")]
+        public InputDevice[] devices;
+
         KartController kart;
         RaceProgress progress;
         float smoothedSteer;
+
+        T Device<T>(T fallback) where T : InputDevice
+        {
+            if (devices == null || devices.Length == 0) return fallback;
+            foreach (var d in devices) if (d is T match && d.added) return match;
+            return null;
+        }
 
         void Awake()
         {
@@ -46,7 +56,7 @@ namespace SugarRush
             float throttle = 0f, steer = 0f, stick = 0f;
             bool drift = false, backToTrack = false;
 
-            var kb = Keyboard.current;
+            var kb = Device(Keyboard.current);
             if (kb != null)
             {
                 if (kb.wKey.isPressed || kb.upArrowKey.isPressed) throttle += 1f;
@@ -57,7 +67,7 @@ namespace SugarRush
                 backToTrack |= kb.rKey.wasPressedThisFrame;
             }
 
-            var pad = Gamepad.current;
+            var pad = Device(Gamepad.current);
             if (pad != null)
             {
                 throttle += pad.rightTrigger.ReadValue() - pad.leftTrigger.ReadValue();
