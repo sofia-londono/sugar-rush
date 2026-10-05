@@ -1298,6 +1298,31 @@ namespace SugarRush.EditorTools
             characterSpot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
             showcase.characterSpot = characterSpot;
 
+            // Two-player page: the camera turns to look straight down the road; each player's kart
+            // sits on its side, angled towards the camera, with the racer beside it (outwards).
+            var duoCam = new GameObject("DuoCameraPose").transform;
+            duoCam.SetParent(showcaseRoot.transform, false);
+            // Tilted down so the karts sit in the upper part of the screen, above the players' panels.
+            duoCam.position = spot - dir * 2f + Vector3.up * 1f;
+            duoCam.LookAt(spot + dir * 6f - Vector3.up * 0.4f);
+            showcase.duoCameraPose = duoCam;
+            for (int i = 0; i < 2; i++)
+            {
+                float side = i == 0 ? -1f : 1f;
+                var kartSpot = new GameObject($"DuoKart{i + 1}").transform;
+                kartSpot.SetParent(showcaseRoot.transform, false);
+                kartSpot.position = spot + dir * 4f + right * (1.7f * side) + Vector3.up * 0.05f;
+                kartSpot.rotation = Quaternion.LookRotation(Quaternion.Euler(0f, 35f * -side, 0f) * -dir, Vector3.up);
+                showcase.duoKartSpots[i] = kartSpot;
+
+                var charSpot = new GameObject($"DuoCharacter{i + 1}").transform;
+                charSpot.SetParent(showcaseRoot.transform, false);
+                charSpot.position = kartSpot.position - dir * 0.3f + right * (1.3f * side);
+                Vector3 look = Vector3.ProjectOnPlane(duoCam.position - charSpot.position, Vector3.up);
+                charSpot.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
+                showcase.duoCharacterSpots[i] = charSpot;
+            }
+
             var ui = AddUIDocument("MainMenuUI");
             var menu = ui.gameObject.AddComponent<MainMenuUI>();
             menu.document = ui;

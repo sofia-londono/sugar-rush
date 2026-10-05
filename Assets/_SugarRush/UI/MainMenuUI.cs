@@ -82,6 +82,7 @@ namespace SugarRush
                 _ => BuildMain(),
             };
             UIKit.ShowScreen(root, screen);
+            showcase.SetDuoMode(page == Page.Local);
             showcase.Show(page == Page.Characters ? previewKart : GameSettings.SelectedKart);
         }
 
@@ -140,19 +141,27 @@ namespace SugarRush
             public InputDevice Device;
             public int Kart;
             public bool Ready;
+            /// <summary>When this seat was taken (gamepads are numbered in joining order).</summary>
+            public int JoinOrder;
             public VisualElement Panel, Body;
             public CandyTitle Name;
             public Label DeviceLabel, Status;
         }
 
         readonly LocalSlot[] localSlots = { new(), new() };
+        int joinCounter;
 
         VisualElement BuildLocal()
         {
             foreach (var slot in localSlots) { slot.Device = null; slot.Ready = false; }
 
-            var screen = UIKit.Div("screen");
+            // Title on top, the two picks in 3D in the middle (KartShowcase duo mode), each
+            // player's panel underneath their kart.
+            var screen = UIKit.Div("screen", "screen--local");
             screen.Add(UIKit.Title(Loc.T("local.title"), CandyTone.Rainbow, "candy-title--lg"));
+            var spacer = UIKit.Div("local-spacer");
+            spacer.pickingMode = PickingMode.Ignore;
+            screen.Add(spacer);
 
             var row = UIKit.Div("local-slots");
             for (int i = 0; i < localSlots.Length; i++)
@@ -160,7 +169,7 @@ namespace SugarRush
                 var slot = localSlots[i];
                 slot.Panel = new FrostingPanel(i == 0 ? CandyTone.Pink : CandyTone.Sky, 61 + i);
                 slot.Panel.AddToClassList("local-slot");
-                slot.Panel.Add(UIKit.Title(Loc.T("lobby.short", i + 1), i == 0 ? CandyTone.Pink : CandyTone.Sky, "candy-title--md"));
+                slot.Panel.Add(UIKit.Title(Loc.T("lobby.short", i + 1), i == 0 ? CandyTone.Pink : CandyTone.Sky, "candy-title--sm"));
                 slot.Body = UIKit.Div("menu-column");
                 slot.Panel.Add(slot.Body);
                 row.Add(slot.Panel);
@@ -168,12 +177,16 @@ namespace SugarRush
             }
             screen.Add(row);
 
-            screen.Add(UIKit.Label(Loc.T("local.hint"), "small-text"));
-            screen.Add(UIKit.Label(Loc.T("local.pressButton"), "small-text"));
+            var footer = UIKit.Div("row", "local-footer");
+            var hints = UIKit.Div("local-hints");
+            hints.Add(UIKit.Label(Loc.T("local.hint"), "local-hint"));
+            hints.Add(UIKit.Label(Loc.T("local.pressButton"), "local-hint", "local-hint--small"));
+            footer.Add(hints);
+            screen.Add(footer);
             // Not focusable: the A / Enter presses on this page belong to the players' seats.
             var back = UIKit.BackButton(Loc.T("menu.back"), () => ShowPage(Page.Main), "candy-button--lemon", "candy-button--small");
             back.focusable = false;
-            screen.Add(back);
+            footer.Add(back);
             root.focusController?.focusedElement?.Blur();
             return screen;
         }
@@ -186,9 +199,11 @@ namespace SugarRush
             if (slot.Device == null)
             {
                 slot.Body.Add(UIKit.Label(Loc.T("local.join"), "local-slot__waiting"));
+                showcase.HideDuo(index);
                 return;
             }
-            slot.DeviceLabel = UIKit.Label(DeviceName(slot.Device), "local-slot__device");
+            showcase.ShowDuo(index, slot.Kart, slot.Ready);
+            slot.DeviceLabel = UIKit.Label(DeviceName(index), "local-slot__device");
             slot.Body.Add(slot.DeviceLabel);
             var nameRow = UIKit.Div("row");
             nameRow.Add(UIKit.ArrowButton("‹", () => CycleLocal(index, -1), small: true));
@@ -202,11 +217,14 @@ namespace SugarRush
             slot.Body.Add(slot.Status);
         }
 
-        static string DeviceName(InputDevice device)
+        /// <summary>"Keyboard", or "Gamepad N" numbered by joining order (the first to join is 1).</summary>
+        string DeviceName(int index)
         {
-            if (device is Keyboard) return Loc.T("local.keyboard");
+            var slot = localSlots[index];
+            if (slot.Device is Keyboard) return Loc.T("local.keyboard");
             int n = 1;
-            foreach (var pad in Gamepad.all) { if (pad == device) break; n++; }
+            foreach (var other in localSlots)
+                if (other != slot && other.Device is Gamepad && other.JoinOrder < slot.JoinOrder) n++;
             return Loc.T("local.gamepad", n);
         }
 
@@ -229,7 +247,6 @@ namespace SugarRush
                 break;
             }
             AudioHub.UIMove();
-            showcase.Show(slot.Kart);
             RefreshLocalSlot(index);
             UIKit.Pop(slot.Name);
         }
@@ -269,11 +286,12 @@ namespace SugarRush
                     if (free < 0) continue;
                     var slot = localSlots[free];
                     slot.Device = device;
+                    slot.JoinOrder = ++joinCounter;
                     slot.Kart = free == 0 ? GameSettings.SelectedKart : 0;
                     if (KartTakenByOther(slot.Kart, free)) CycleLocalSilently(free);
                     AudioHub.UIConfirm();
-                    showcase.Show(slot.Kart);
-                    RefreshLocalSlot(free);
+                    RefreshLocalSlot(0);
+                    RefreshLocalSlot(1);
                     continue;
                 }
 
@@ -292,7 +310,8 @@ namespace SugarRush
                     AudioHub.UIBack();
                     if (seat.Ready) seat.Ready = false;
                     else seat.Device = null;
-                    RefreshLocalSlot(index);
+                    RefreshLocalSlot(0); // gamepad numbers may shift
+                    RefreshLocalSlot(1);
                 }
             }
         }
