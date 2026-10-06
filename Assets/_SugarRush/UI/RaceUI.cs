@@ -21,6 +21,7 @@ namespace SugarRush
             public CandyTitle Position, Total, Speed, Boost, Message, Tag, Hammer;
             public Label Lap, Time, LostText, Coins;
             public VisualElement CoinRow;
+            public TrackMinimap Minimap;
             public float MessageUntil;
             public bool FinalLapAnnounced;
 
@@ -174,6 +175,10 @@ namespace SugarRush
             h.Speed.AddToClassList("hud-speed");
             speedRow.Add(h.Speed);
             speedRow.Add(UIKit.Label("km/h", "hud-unit"));
+            // Mini-map of the circuit with everyone's position, above the speed.
+            h.Minimap = new TrackMinimap(race.path);
+            if (split) h.Minimap.AddToClassList("minimap--small");
+            bottomRight.Add(h.Minimap);
             bottomRight.Add(h.Boost);
             bottomRight.Add(speedRow);
             h.Root.Add(bottomRight);
@@ -239,6 +244,7 @@ namespace SugarRush
             h.Time.text = Loc.Time(player.Finished ? player.FinishTime : race.RaceTime);
             h.Speed.Text = Mathf.RoundToInt(player.Kart.Speed * 3.6f).ToString();
             h.Boost.EnableInClassList("hidden", !player.Kart.IsBoosting);
+            h.Minimap.Refresh(race.Racers, player, race.roster, chaos);
 
             bool chaosOn = chaos && chaos.Active;
             h.CoinRow.EnableInClassList("hidden", !chaosOn);

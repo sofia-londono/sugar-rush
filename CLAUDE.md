@@ -55,6 +55,8 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
   - Textos en `Loc` (español/inglés), idioma en Opciones.
 - `GameSettings` (PlayerPrefs): idioma, volumen de música y de efectos, dificultad, gráficos (nivel de calidad 0 = Mobile/rendimiento, 1 = PC/calidad; ambos activos en todas las plataformas), vueltas, kart elegido. "Rendimiento" es el valor por defecto en todas partes; `settingsVersion` < 2 (guardado antes de ese cambio) lo fuerza una vez.
 - Gráficos "Rendimiento" en carreras de un jugador (también en línea): `Mobile_RPAsset` con render scale 0,85, sombras de la pista apagadas, distancia de dibujado 420 m con neblina pastel y límite de 60 FPS (`RaceManager.SetupPerformanceMode`, comparte `ApplyLowSpec` con la pantalla dividida). Medido en el portátil (copia de Windows, 1080p): Rendimiento 100–113 FPS sin límite (antes ~30–35), Calidad 26–33 FPS.
+- Mini-mapa en el HUD (`TrackMinimap`, abajo a la derecha sobre la velocidad; más chico en pantalla dividida): el circuito dibujado una vez con Painter2D desde `TrackPath`, la meta, los tramos rotos por Ralph y un punto por corredor con el color de su kart (el propio más grande). Solo los puntos se mueven cada cuadro.
+- Página "Jugar en línea": Partida rápida arriba y dos tarjetas: "¿Juegas con amigos? Crea una sala" (Privada/Pública + Crear sala) y "¿Te pasaron un código?" (campo con ejemplo "EJ: JT7PKQ" + Unirse). La sala de espera explica dónde escriben el código los amigos.
 - Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
 - Pendiente: versión web (WebGL + controles táctiles con aceleración automática, Vercel), iluminación baked.
 
