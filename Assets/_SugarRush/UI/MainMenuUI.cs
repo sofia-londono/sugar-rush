@@ -365,7 +365,7 @@ namespace SugarRush
         {
             var screen = UIKit.Div("screen");
             var panel = new FrostingPanel(CandyTone.Sky, 19);
-            panel.AddToClassList("frosting-panel--wide");
+            panel.AddToClassList("online-panel");
             var heading = UIKit.Title(Loc.T("online.title"), CandyTone.Pink, "candy-title--md");
             heading.AddToClassList("panel-heading");
             panel.Add(heading);
@@ -375,22 +375,48 @@ namespace SugarRush
             onlineButtons.Add(quick);
             onlineButtons.Add(UIKit.Label(Loc.T("online.quickNote"), "panel-note"));
 
-            var createRow = UIKit.Div("row", "create-row");
-            createRow.Add(UIKit.Button(Loc.T("online.create"), CreateRoom, "candy-button--sky", "candy-button--small"));
-            createRow.Add(OptionRow("online.roomType", () => Loc.T(createPublic ? "online.public" : "online.private"), _ => createPublic = !createPublic));
-            onlineButtons.Add(createRow);
-            onlineButtons.Add(UIKit.Label(Loc.T("online.or"), "panel-note"));
+            // Two cards: make a room (and get a code to share) / type the code a friend sent.
+            var cards = UIKit.Div("online-cards");
 
-            var joinRow = UIKit.Div("row");
+            var createCard = UIKit.Div("online-card");
+            createCard.Add(UIKit.Label(Loc.T("online.createTitle"), "online-card__title"));
+            var typeRow = UIKit.Div("row", "room-type-row");
+            Button privateButton = null, publicButton = null;
+            void RefreshType()
+            {
+                privateButton.EnableInClassList("room-type--on", !createPublic);
+                publicButton.EnableInClassList("room-type--on", createPublic);
+            }
+            privateButton = UIKit.Button(Loc.T("online.private"), () => { createPublic = false; RefreshType(); }, "candy-button--small", "room-type");
+            publicButton = UIKit.Button(Loc.T("online.public"), () => { createPublic = true; RefreshType(); }, "candy-button--small", "room-type");
+            typeRow.Add(privateButton);
+            typeRow.Add(publicButton);
+            RefreshType();
+            createCard.Add(typeRow);
+            var typeNote = UIKit.Label("", "online-card__note");
+            void RefreshTypeNote() => typeNote.text = Loc.T(createPublic ? "online.publicNote" : "online.privateNote");
+            privateButton.clicked += RefreshTypeNote;
+            publicButton.clicked += RefreshTypeNote;
+            RefreshTypeNote();
+            createCard.Add(typeNote);
+            createCard.Add(UIKit.Button(Loc.T("online.create"), CreateRoom, "candy-button--sky", "online-card__button"));
+            cards.Add(createCard);
+
+            var joinCard = UIKit.Div("online-card");
+            joinCard.Add(UIKit.Label(Loc.T("online.joinTitle"), "online-card__title"));
+            joinCard.Add(UIKit.Label(Loc.T("online.joinNote"), "online-card__note"));
             codeField = new TextField { maxLength = 8, isDelayed = false };
             codeField.AddToClassList("candy-input");
+            codeField.textEdition.placeholder = Loc.T("online.codeHint");
             codeField.RegisterCallback<KeyDownEvent>(e =>
             {
                 if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) JoinRoom();
             });
-            joinRow.Add(codeField);
-            joinRow.Add(UIKit.Button(Loc.T("online.join"), JoinRoom, "candy-button--mint", "candy-button--small"));
-            onlineButtons.Add(joinRow);
+            joinCard.Add(codeField);
+            joinCard.Add(UIKit.Button(Loc.T("online.join"), JoinRoom, "candy-button--mint", "online-card__button"));
+            cards.Add(joinCard);
+
+            onlineButtons.Add(cards);
             panel.Add(onlineButtons);
 
             onlineStatus = UIKit.Label("", "online-status");
