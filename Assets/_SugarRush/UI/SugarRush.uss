@@ -1166,3 +1166,161 @@
     background-color: #5A3020;
     rotate: 45deg;
 }
+
+/* ---- Touch controls (phones / tablets) ---- */
+.touch-pad {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.touch-group {
+    position: absolute;
+    bottom: 36px;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.touch-group--left {
+    left: 40px;
+}
+
+.touch-group--right {
+    right: 40px;
+}
+
+.touch-column {
+    margin-right: 22px;
+    align-items: center;
+}
+
+.touch-button {
+    width: 190px;
+    height: 190px;
+    border-radius: 95px;
+    margin: 0 14px;
+    align-items: center;
+    justify-content: center;
+    border-width: 6px;
+    border-color: rgba(255, 255, 255, 0.95);
+    background-color: rgba(255, 143, 199, 0.55);
+    transition-property: scale, background-color;
+    transition-duration: 0.08s;
+}
+
+.touch-button--down {
+    scale: 0.9 0.9;
+    background-color: rgba(255, 143, 199, 0.85);
+}
+
+.touch-button__label {
+    font-size: 40px;
+    color: #FFFFFF;
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: var(--choco);
+}
+
+.touch-button--steer > .touch-button__label {
+    font-size: 110px;
+    margin-top: -14px;
+}
+
+.touch-button--gas {
+    width: 230px;
+    height: 230px;
+    border-radius: 115px;
+    background-color: rgba(110, 220, 170, 0.6);
+}
+
+.touch-button--brake,
+.touch-button--drift {
+    width: 150px;
+    height: 150px;
+    border-radius: 75px;
+    margin: 10px 0;
+}
+
+.touch-button--brake {
+    background-color: rgba(255, 210, 90, 0.6);
+}
+
+.touch-button--drift {
+    background-color: rgba(170, 140, 255, 0.6);
+}
+
+.touch-button__label {
+    -unity-text-align: middle-center;
+}
+
+.touch-pause {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    translate: -50% 0;
+    width: 104px;
+    height: 104px;
+    border-radius: 52px;
+    border-width: 5px;
+    border-color: #FFFFFF;
+    background-color: rgba(195, 163, 255, 0.7);
+    align-items: center;
+    justify-content: center;
+}
+
+.touch-pause__label {
+    font-size: 44px;
+    color: #FFFFFF;
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+}
+
+/* Speed and mini-map move up out of the pedals' way. */
+.hud--touch .hud-corner--bottom-right {
+    bottom: 400px;
+}
+
+.hud--touch .minimap {
+    width: 250px;
+    height: 200px;
+}
+
+.rotate-hint {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #FFC9E0;
+    align-items: center;
+    justify-content: center;
+}
+
+.rotate-hint__text {
+    font-size: 64px;
+    color: var(--choco);
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+    -unity-text-align: middle-center;
+    white-space: normal;
+    padding: 0 60px;
+}
+
+/* ---- Access code (web) ---- */
+.gate-panel {
+    width: 900px;
+    align-items: center;
+}
+
+.gate-prompt {
+    font-size: 38px;
+    color: var(--choco);
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+    -unity-text-align: middle-center;
+    white-space: normal;
+    margin: 6px 0 10px 0;
+}
+
+.gate-input {
+    width: 520px;
+}

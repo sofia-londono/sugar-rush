@@ -23,6 +23,8 @@ namespace SugarRush
         public static bool RalphChaos { get; set; } = true;
         /// <summary>Racers sitting in their karts during races (a baked, unanimated mesh each).</summary>
         public static bool DriversInRace { get; set; } = true;
+        /// <summary>Touch controls: the kart accelerates by itself (steer, brake and drift only).</summary>
+        public static bool AutoAccelerate { get; set; } = true;
         public static int SelectedKart { get; set; }
 
         public static event Action Changed;
@@ -44,6 +46,7 @@ namespace SugarRush
             Laps = Mathf.Clamp(PlayerPrefs.GetInt("laps", 3), MinLaps, MaxLaps);
             RalphChaos = PlayerPrefs.GetInt("ralphChaos", 1) != 0;
             DriversInRace = PlayerPrefs.GetInt("drivers", 1) != 0;
+            AutoAccelerate = PlayerPrefs.GetInt("autoGas", 1) != 0;
             SelectedKart = PlayerPrefs.GetInt("kart", 0);
             Apply();
         }
@@ -59,6 +62,7 @@ namespace SugarRush
             PlayerPrefs.SetInt("laps", Laps);
             PlayerPrefs.SetInt("ralphChaos", RalphChaos ? 1 : 0);
             PlayerPrefs.SetInt("drivers", DriversInRace ? 1 : 0);
+            PlayerPrefs.SetInt("autoGas", AutoAccelerate ? 1 : 0);
             PlayerPrefs.SetInt("kart", SelectedKart);
             PlayerPrefs.Save();
             Apply();

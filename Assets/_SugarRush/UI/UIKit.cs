@@ -166,6 +166,21 @@ namespace SugarRush
 
         // ------------------------------------------------------------ Input shortcuts
 
+        /// <summary>"Turn your phone sideways" curtain; call UpdateRotateHint every frame.</summary>
+        public static VisualElement RotateHint()
+        {
+            var hint = Div("rotate-hint", "hidden");
+            hint.Add(Label(Loc.T("rotate.hint"), "rotate-hint__text"));
+            return hint;
+        }
+
+        public static void UpdateRotateHint(VisualElement hint)
+        {
+            if (hint == null) return;
+            bool portrait = TouchDriving.Enabled && UnityEngine.Screen.height > UnityEngine.Screen.width;
+            if (hint.ClassListContains("hidden") == portrait) hint.EnableInClassList("hidden", !portrait);
+        }
+
         public static bool BackPressed() =>
             (Keyboard.current?.escapeKey.wasPressedThisFrame ?? false) ||
             (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);

@@ -12,14 +12,14 @@ namespace SugarRush
     /// </summary>
     public class MainMenuUI : MonoBehaviour
     {
-        enum Page { Main, Characters, Options, Online, Lobby, Local }
+        enum Page { Main, Characters, Options, Online, Lobby, Local, Gate }
 
         public UIDocument document;
         public KartRoster roster;
         public KartShowcase showcase;
         [Tooltip("Camera tour of the track behind the main page.")]
         public MenuCameraTour tour;
-        VisualElement tourFade;
+        VisualElement tourFade, rotateHint;
 
         VisualElement root;
         Page page;
@@ -48,9 +48,10 @@ namespace SugarRush
             tourFade.style.opacity = 0f;
             root.Add(tourFade); // under everything: the soft pink cut between tour shots
             root.Add(new SprinkleRain(40));
+            rotateHint = UIKit.RotateHint();
             previewKart = GameSettings.SelectedKart;
             // Back from an online race: straight to the waiting room.
-            ShowPage(OnlineSession.IsOnline ? Page.Lobby : Page.Main);
+            ShowPage(AccessGate.Locked ? Page.Gate : OnlineSession.IsOnline ? Page.Lobby : Page.Main);
             UIKit.FadeIn(root);
             if (SoundLibrary.Instance) AudioHub.PlayMusic(SoundLibrary.Instance.menuMusic);
         }
@@ -58,9 +59,16 @@ namespace SugarRush
         void Update()
         {
             if (tourFade != null) tourFade.style.opacity = tour ? tour.Fade : 0f;
+            if (rotateHint != null)
+            {
+                if (rotateHint.parent != root) root.Add(rotateHint); // keep it above every page
+                else if (root.IndexOf(rotateHint) != root.childCount - 1) rotateHint.BringToFront();
+                UIKit.UpdateRotateHint(rotateHint);
+            }
             if (leaving) return;
             if (page == Page.Lobby) UpdateLobby();
             if (page == Page.Local) { UpdateLocal(); return; }
+            if (page == Page.Gate) return; // no way around the access code
             if (page != Page.Main && UIKit.BackPressed() && !connecting && !(codeField != null && codeField.focusController?.focusedElement == codeField))
             {
                 AudioHub.UIBack();
@@ -87,6 +95,7 @@ namespace SugarRush
                 Page.Online => BuildOnline(),
                 Page.Lobby => BuildLobby(),
                 Page.Local => BuildLocal(),
+                Page.Gate => BuildGate(),
                 _ => BuildMain(),
             };
             UIKit.ShowScreen(root, screen);
@@ -145,6 +154,47 @@ namespace SugarRush
             GameSettings.Save();
             RaceSetup.SetSingle();
             UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
+        }
+
+        // ------------------------------------------------------------ Access code (web)
+
+        VisualElement BuildGate()
+        {
+            var screen = UIKit.Div("screen");
+            var panel = new FrostingPanel(CandyTone.Pink, 5);
+            panel.AddToClassList("gate-panel");
+            panel.Add(UIKit.Title("Sugar Rush", CandyTone.Pink, "candy-title--lg"));
+            panel.Add(UIKit.Label(Loc.T("gate.prompt"), "gate-prompt"));
+
+            var field = new TextField { maxLength = 24, isDelayed = false };
+            field.AddToClassList("candy-input");
+            field.AddToClassList("gate-input");
+            field.textEdition.placeholder = Loc.T("gate.hint");
+            panel.Add(field);
+            var error = UIKit.Label("", "online-status");
+            void Submit()
+            {
+                if (AccessGate.TryUnlock(field.value))
+                {
+                    AudioHub.UIConfirm();
+                    ShowPage(Page.Main);
+                }
+                else
+                {
+                    AudioHub.UIBack();
+                    error.text = Loc.T("gate.wrong");
+                    UIKit.Pop(error);
+                }
+            }
+            field.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) Submit();
+            });
+            panel.Add(UIKit.Button(Loc.T("gate.enter"), Submit, "candy-button--mint"));
+            panel.Add(error);
+            screen.Add(panel);
+            field.schedule.Execute(() => field.Focus()).StartingIn(300);
+            return screen;
         }
 
         // ------------------------------------------------------------ Local split screen
@@ -703,6 +753,13 @@ namespace SugarRush
                 GameSettings.Quality = GameSettings.Quality == 0 ? QualitySettings.names.Length - 1 : 0;
                 GameSettings.Save();
             }));
+
+            if (TouchDriving.Enabled)
+                panel.Add(OptionRow("opt.autoGas", () => Loc.T(GameSettings.AutoAccelerate ? "opt.on" : "opt.off"), dir =>
+                {
+                    GameSettings.AutoAccelerate = !GameSettings.AutoAccelerate;
+                    GameSettings.Save();
+                }));
 
             panel.Add(OptionRow("opt.drivers", () => Loc.T(GameSettings.DriversInRace ? "opt.on" : "opt.off"), dir =>
             {

@@ -38,7 +38,7 @@ namespace SugarRush
         RalphChaos chaos;
         ResultsPodium podium;
         VisualElement podiumView;
-        VisualElement root, overlay, sharedCenter, bannerBox;
+        VisualElement root, overlay, sharedCenter, bannerBox, touchPad, gasButton, rotateHint;
         CandyTitle countdown, banner;
         float bannerUntil;
         Label pauseHint;
@@ -56,6 +56,9 @@ namespace SugarRush
             root = document.rootVisualElement;
             root.Clear();
             BuildShared();
+            if (TouchDriving.Enabled && !RaceSetup.IsSplitScreen) BuildTouchControls();
+            rotateHint = UIKit.RotateHint();
+            root.Add(rotateHint);
             race.StateChanged += OnStateChanged;
             race.RacerLapCompleted += OnLapCompleted;
             race.LocalPlayerFinished += OnLocalPlayerFinished;
@@ -73,6 +76,7 @@ namespace SugarRush
 
         void OnDestroy()
         {
+            TouchDriving.Release();
             if (!race) return;
             race.StateChanged -= OnStateChanged;
             race.RacerLapCompleted -= OnLapCompleted;
@@ -135,6 +139,7 @@ namespace SugarRush
             var h = new PlayerHud { Player = player };
             h.Root = UIKit.Div("hud");
             if (split) h.Root.AddToClassList(index == 0 ? "hud--left" : "hud--right");
+            if (touchPad != null) h.Root.AddToClassList("hud--touch");
 
             string big = split ? "candy-title--lg" : "candy-title--xl";
             string mid = split ? "candy-title--md" : "candy-title--lg";
@@ -196,6 +201,12 @@ namespace SugarRush
 
             foreach (var e in h.Root.Query<VisualElement>().ToList()) e.pickingMode = PickingMode.Ignore;
             h.Root.pickingMode = PickingMode.Ignore;
+            if (touchPad != null)
+            {
+                // Phones: tapping the "lost?" panel puts the kart back on the track.
+                h.Lost.pickingMode = PickingMode.Position;
+                h.Lost.RegisterCallback<PointerDownEvent>(_ => TouchDriving.RequestBackToTrack());
+            }
             return h;
         }
 
@@ -213,7 +224,14 @@ namespace SugarRush
             }
 
             foreach (var h in huds) RefreshHud(h);
-            pauseHint.EnableInClassList("hidden", resultsShown);
+            pauseHint.EnableInClassList("hidden", resultsShown || touchPad != null);
+            UIKit.UpdateRotateHint(rotateHint);
+            if (touchPad != null)
+            {
+                touchPad.EnableInClassList("hidden", resultsShown || race.IsPaused);
+                gasButton.EnableInClassList("hidden", GameSettings.AutoAccelerate);
+                if (resultsShown || race.IsPaused) TouchDriving.Release();
+            }
             RefreshBanner();
 
             if (resultsShown)
@@ -270,10 +288,66 @@ namespace SugarRush
             bool showLost = player.NeedsHelp && !player.Finished && !race.IsPaused;
             h.Lost.EnableInClassList("hidden", !showLost);
             if (showLost)
-                h.LostText.text = Loc.T("hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
+                h.LostText.text = Loc.T(touchPad != null ? "touch.lost" : "hud.lost") + "\n" + Loc.T("hud.autoReturn", Mathf.CeilToInt(Mathf.Max(0f, player.AutoReturnIn)));
         }
 
         PlayerHud HudOf(RaceProgress racer) => huds.Find(h => h.Player == racer);
+
+        // ------------------------------------------------------------ Touch controls
+
+        /// <summary>Phones: steer on the left, gas / brake / drift on the right, pause at the top.</summary>
+        void BuildTouchControls()
+        {
+            touchPad = UIKit.Div("touch-pad");
+            touchPad.pickingMode = PickingMode.Ignore;
+
+            var left = UIKit.Div("touch-group", "touch-group--left");
+            left.pickingMode = PickingMode.Ignore;
+            left.Add(HoldButton("‹", "touch-button--steer", v => TouchDriving.Left = v));
+            left.Add(HoldButton("›", "touch-button--steer", v => TouchDriving.Right = v));
+            touchPad.Add(left);
+
+            var right = UIKit.Div("touch-group", "touch-group--right");
+            right.pickingMode = PickingMode.Ignore;
+            var column = UIKit.Div("touch-column");
+            column.pickingMode = PickingMode.Ignore;
+            column.Add(HoldButton(Loc.T("touch.drift"), "touch-button--drift", v => TouchDriving.Drift = v));
+            column.Add(HoldButton(Loc.T("touch.brake"), "touch-button--brake", v => TouchDriving.Brake = v));
+            right.Add(column);
+            gasButton = HoldButton(Loc.T("touch.gas"), "touch-button--gas", v => TouchDriving.Gas = v);
+            right.Add(gasButton);
+            touchPad.Add(right);
+
+            var pause = UIKit.Div("touch-pause");
+            pause.Add(UIKit.Label("II", "touch-pause__label"));
+            pause.RegisterCallback<PointerDownEvent>(_ =>
+            {
+                if (resultsShown || leaving || race.IsPaused) return;
+                AudioHub.UIConfirm();
+                SetPaused(true);
+            });
+            touchPad.Add(pause);
+            root.Add(touchPad);
+        }
+
+        /// <summary>A button that reports pressed / released (multi-touch: each finger has its own pointer).</summary>
+        static VisualElement HoldButton(string text, string cls, System.Action<bool> set)
+        {
+            var b = UIKit.Div("touch-button", cls);
+            var label = UIKit.Label(text, "touch-button__label");
+            label.pickingMode = PickingMode.Ignore;
+            b.Add(label);
+            void Press(bool down)
+            {
+                set(down);
+                b.EnableInClassList("touch-button--down", down);
+            }
+            b.RegisterCallback<PointerDownEvent>(e => { b.CapturePointer(e.pointerId); Press(true); });
+            b.RegisterCallback<PointerUpEvent>(e => { b.ReleasePointer(e.pointerId); Press(false); });
+            b.RegisterCallback<PointerCancelEvent>(e => { b.ReleasePointer(e.pointerId); Press(false); });
+            b.RegisterCallback<PointerCaptureOutEvent>(_ => Press(false));
+            return b;
+        }
 
         // ------------------------------------------------------------ Ralph's chaos
 

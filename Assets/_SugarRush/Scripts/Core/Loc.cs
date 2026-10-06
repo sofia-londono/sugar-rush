@@ -21,6 +21,12 @@ namespace SugarRush
                                 "Non-profit fan game · 3D models (CC BY 4.0): RazyBerry, amogusstrikesback2, danigamer495channel, guinavarro.al & Kit7207 · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
             ["menu.best"] = ("Récord ({0} vueltas): {1}", "Best ({0} laps): {1}"),
 
+            // Access code (web)
+            ["gate.prompt"] = ("Escribe el código de acceso para jugar", "Type the access code to play"),
+            ["gate.hint"] = ("CÓDIGO", "CODE"),
+            ["gate.enter"] = ("¡Entrar!", "Let me in!"),
+            ["gate.wrong"] = ("Ese no es el código. Pídeselo a quien te invitó", "That's not the code. Ask whoever invited you"),
+
             // Online
             ["menu.online"] = ("Jugar en línea", "Play online"),
             ["online.title"] = ("Jugar en línea", "Play online"),
@@ -99,6 +105,12 @@ namespace SugarRush
             ["opt.laps"] = ("Vueltas", "Laps"),
             ["opt.chaos"] = ("Caos de Ralph", "Ralph's chaos"),
             ["opt.drivers"] = ("Pilotos en carrera", "Drivers in race"),
+            ["opt.autoGas"] = ("Acelerar solo", "Auto-accelerate"),
+            ["touch.gas"] = ("Acelerar", "Gas"),
+            ["touch.brake"] = ("Frenar", "Brake"),
+            ["touch.drift"] = ("Derrapar", "Drift"),
+            ["touch.lost"] = ("¿Perdido? Toca aquí para volver a la pista", "Lost? Tap here to get back on track"),
+            ["rotate.hint"] = ("Gira tu teléfono para jugar", "Turn your phone sideways to play"),
             ["opt.on"] = ("Activado", "On"),
             ["opt.off"] = ("Desactivado", "Off"),
 

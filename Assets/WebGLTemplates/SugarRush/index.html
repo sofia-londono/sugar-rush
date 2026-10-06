@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <!-- Private fan game: keep it out of search engines (robots.txt and an X-Robots-Tag header do the same). -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#FFC9E0">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #FFC9E0; }
+    #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #FFC9E0; outline: none; }
+    #loader {
+      position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 40%, #FFE3F0 0%, #FFC9E0 60%, #F7A8CF 100%);
+      font-family: "Trebuchet MS", "Arial Rounded MT Bold", sans-serif; color: #5C2E62; z-index: 2;
+    }
+    #loader h1 {
+      margin: 0 0 28px 0; font-size: min(12vw, 84px); letter-spacing: 2px; color: #FF8FC7;
+      text-shadow: 0 0 0 #fff, 3px 3px 0 #fff, -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 0 8px 0 #C46A9E;
+    }
+    #bar { width: min(70vw, 520px); height: 30px; border-radius: 15px; background: #fff; border: 5px solid #fff; box-shadow: 0 6px 0 #E58BB8; overflow: hidden; }
+    #fill {
+      width: 0%; height: 100%; border-radius: 10px; transition: width 0.2s;
+      background: repeating-linear-gradient(-45deg, #FF8FC7 0 14px, #FFB8DA 14px 28px);
+    }
+    #msg { margin-top: 18px; font-size: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <h1>SUGAR RUSH</h1>
+    <div id="bar"><div id="fill"></div></div>
+    <div id="msg">Cargando dulces...</div>
+  </div>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <script>
+    var canvas = document.getElementById("unity-canvas");
+    var fill = document.getElementById("fill");
+    var buildUrl = "Build";
+    var config = {
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if MEMORY_FILENAME
+      memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+      symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+      productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+      productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+      // Draw at 1 pixel per CSS pixel: much lighter on laptops with high-DPI screens and on phones.
+      devicePixelRatio: 1,
+    };
+    var script = document.createElement("script");
+    script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (progress) {
+        fill.style.width = (100 * progress) + "%";
+      }).then(function () {
+        document.getElementById("loader").remove();
+        canvas.focus();
+      }).catch(function (message) {
+        document.getElementById("msg").textContent = "No se pudo cargar el juego: " + message;
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

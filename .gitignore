@@ -44,3 +44,9 @@ crashlytics-build.properties
 Thumbs.db
 /AgentScripts/
 /Assets/AgentScripts*
+
+# Web version: the access code stays on this PC (the repo is public); the build output is deployed, not committed
+web-access-code.txt
+/Assets/_SugarRush/Resources/Web/AccessHash.txt
+/Assets/_SugarRush/Resources/Web/AccessHash.txt.meta
+/Web/

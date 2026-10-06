@@ -78,6 +78,18 @@ namespace SugarRush
                 backToTrack |= pad.buttonNorth.wasPressedThisFrame;
             }
 
+            // Phones: on-screen buttons (only for a lone local player, i.e. no split screen).
+            if (TouchDriving.Enabled && (devices == null || devices.Length == 0))
+            {
+                bool autoGas = GameSettings.AutoAccelerate;
+                if (TouchDriving.Gas || (autoGas && !TouchDriving.Brake)) throttle += 1f;
+                if (TouchDriving.Brake) throttle -= 1f;
+                if (TouchDriving.Right) steer += 1f;
+                if (TouchDriving.Left) steer -= 1f;
+                drift |= TouchDriving.Drift;
+                backToTrack |= TouchDriving.ConsumeBackToTrack();
+            }
+
             // Keys are all-or-nothing, so ease them in: a tap gives a small correction, holding
             // gives full lock. Releasing (or reversing) returns faster than it builds up.
             bool releasing = Mathf.Abs(steer) < 0.01f;
