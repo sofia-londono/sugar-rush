@@ -43,7 +43,7 @@ namespace SugarRush
         /// <summary>Host: once every client has the track loaded, spawn the grid and count down.</summary>
         void OnRaceSceneLoadedForAll(string sceneName, LoadSceneMode mode, List<ulong> completed, List<ulong> timedOut)
         {
-            if (sceneName != SceneNames.Race) return;
+            if (!Tracks.IsRaceScene(sceneName)) return;
             NetworkManager.Singleton.SceneManager.OnLoadEventCompleted -= OnRaceSceneLoadedForAll;
 
             var raceGo = Instantiate(Resources.Load<GameObject>(NetRaceResource));

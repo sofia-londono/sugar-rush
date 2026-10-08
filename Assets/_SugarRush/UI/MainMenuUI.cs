@@ -30,9 +30,14 @@ namespace SugarRush
         Label onlineStatus;
         TextField codeField;
         VisualElement onlineButtons, lobbyRows;
-        CandyTitle lobbyKartName, lobbyCount;
-        int shownLobbyVersion = -1;
+        CandyTitle lobbyKartName, lobbyCount, lobbyTrackName;
+        VisualElement lobbyTrackPicker;
+        int shownLobbyVersion = -1, shownLobbyTrack = -1;
         bool connecting, justJoined;
+
+        // Main page track picker
+        CandyTitle trackName;
+        Label bestLabel;
 
         // Character page widgets that change when cycling karts
         CandyTitle charName;
@@ -117,6 +122,9 @@ namespace SugarRush
             column.Add(UIKit.Title("Sugar Rush", CandyTone.Rainbow, "candy-title--xl"));
             column.Add(UIKit.Label(Loc.T("menu.subtitle"), "subtitle"));
 
+            // Track for "Play" and split screen (online, the host picks it in the room).
+            column.Add(TrackPicker(true, true, ChangeTrack, out trackName, CandyTone.Lemon));
+
             // One big "Play", the other modes as smaller tiles in a 2x2 grid, "Quit" small at the bottom.
             var play = UIKit.Button(Loc.T("menu.play"), Play, "candy-button--hero");
             column.Add(play);
@@ -131,9 +139,9 @@ namespace SugarRush
             column.Add(UIKit.Button(Loc.T("menu.quit"), Quit, "candy-button--lemon", "candy-button--small", "candy-button--quit"));
 #endif
 
-            float best = GameSettings.GetBestTime(GameSettings.Laps);
-            if (best > 0f)
-                column.Add(UIKit.Label(Loc.T("menu.best", GameSettings.Laps, Loc.Time(best)), "small-text"));
+            bestLabel = UIKit.Label("", "small-text");
+            column.Add(bestLabel);
+            RefreshTrack();
 
             if (!string.IsNullOrEmpty(OnlineSession.PendingMessageKey))
             {
@@ -153,7 +161,54 @@ namespace SugarRush
             AudioHub.UIConfirm();
             GameSettings.Save();
             RaceSetup.SetSingle();
-            UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
+            UIKit.FadeOut(root, () => SceneManager.LoadScene(Tracks.Selected.Scene));
+        }
+
+        // ------------------------------------------------------------ Track picker
+
+        /// <summary>
+        /// "Track" label over "‹ TRACK NAME ›". Editable pickers are focusable; with
+        /// <paramref name="navigation"/> left/right on the focused picker changes the track.
+        /// </summary>
+        VisualElement TrackPicker(bool editable, bool navigation, System.Action<int> change, out CandyTitle name, CandyTone tone)
+        {
+            var box = UIKit.Div("track-picker");
+            box.Add(UIKit.Label(Loc.T("menu.track"), "track-picker__label"));
+            var row = UIKit.Div("row");
+            name = UIKit.Title("", tone, "candy-title--sm");
+            name.AddToClassList("track-picker__name");
+            if (editable) row.Add(UIKit.ArrowButton("‹", () => change(-1), small: true));
+            row.Add(name);
+            if (editable) row.Add(UIKit.ArrowButton("›", () => change(1), small: true));
+            box.Add(row);
+            if (!editable) return box;
+            box.focusable = true;
+            if (navigation)
+                box.RegisterCallback<NavigationMoveEvent>(e =>
+                {
+                    int dir = e.direction == NavigationMoveEvent.Direction.Left ? -1 : e.direction == NavigationMoveEvent.Direction.Right ? 1 : 0;
+                    if (dir == 0) return;
+                    AudioHub.UIMove();
+                    change(dir);
+                    e.StopPropagation();
+                });
+            return box;
+        }
+
+        void ChangeTrack(int dir)
+        {
+            GameSettings.Track = Tracks.Next(GameSettings.Track, dir);
+            GameSettings.Save();
+            RefreshTrack();
+            UIKit.Pop(trackName);
+        }
+
+        void RefreshTrack()
+        {
+            trackName.Text = Tracks.Selected.DisplayName;
+            float best = GameSettings.GetBestTime(GameSettings.Track, GameSettings.Laps);
+            bestLabel.text = best > 0f ? Loc.T("menu.best", GameSettings.Laps, Loc.Time(best)) : "";
+            bestLabel.EnableInClassList("hidden", best <= 0f);
         }
 
         // ------------------------------------------------------------ Access code (web)
@@ -398,7 +453,7 @@ namespace SugarRush
             foreach (var slot in localSlots)
                 players.Add(new RaceSetup.LocalPlayer { Kart = slot.Kart, Devices = new[] { slot.Device } });
             RaceSetup.SetLocalSplit(players);
-            UIKit.FadeOut(root, () => SceneManager.LoadScene(SceneNames.Race));
+            UIKit.FadeOut(root, () => SceneManager.LoadScene(Tracks.Selected.Scene));
         }
 
         void Quit()
@@ -558,6 +613,13 @@ namespace SugarRush
             pickRow.Add(UIKit.ArrowButton("›", () => CycleLobbyKart(1), small: true));
             panel.Add(pickRow);
 
+            // The host picks the track; guests see it change.
+            lobbyTrackPicker = TrackPicker(OnlineSession.IsHost, false, dir => { if (NetLobby.Instance) NetLobby.Instance.CycleTrack(dir); },
+                out lobbyTrackName, CandyTone.Lavender);
+            lobbyTrackPicker.AddToClassList("track-picker--panel");
+            panel.Add(lobbyTrackPicker);
+            shownLobbyTrack = -1;
+
             var buttons = UIKit.Div("row");
             Button focus;
             if (OnlineSession.IsHost)
@@ -581,9 +643,22 @@ namespace SugarRush
         void UpdateLobby()
         {
             if (!OnlineSession.IsOnline) { ShowPage(Page.Main); return; }
-            int dir = UIKit.HorizontalPressed();
-            if (dir != 0) { AudioHub.UIMove(); CycleLobbyKart(dir); }
             var lobby = NetLobby.Instance;
+            int dir = UIKit.HorizontalPressed();
+            if (dir != 0)
+            {
+                AudioHub.UIMove();
+                // Left / right changes the track while its picker has focus (host), the racer otherwise.
+                bool onTrack = lobbyTrackPicker != null && lobbyTrackPicker.focusController?.focusedElement == lobbyTrackPicker;
+                if (onTrack && lobby) lobby.CycleTrack(dir);
+                else CycleLobbyKart(dir);
+            }
+            if (lobby && lobbyTrackName != null && lobby.Track.Value != shownLobbyTrack)
+            {
+                if (shownLobbyTrack >= 0) UIKit.Pop(lobbyTrackName);
+                shownLobbyTrack = lobby.Track.Value;
+                lobbyTrackName.Text = Tracks.Get(shownLobbyTrack).DisplayName;
+            }
             if (!lobby || lobbyRows == null || lobby.Version == shownLobbyVersion) return;
             shownLobbyVersion = lobby.Version;
 

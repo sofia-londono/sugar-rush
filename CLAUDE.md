@@ -3,31 +3,37 @@
 Juego de carreras de karts inspirado en el circuito de Sugar Rush (Wreck-It Ralph / Ralph el demoledor). Proyecto personal de fan sin fines de lucro: el código está en un repo público, pero el juego no se vende ni se distribuye como producto (IP de Disney).
 
 ## Para retomar (leer primero)
-Estado al 2026-10-07 (último commit `32911d6`, rama `main` al día con `origin/main`, árbol limpio):
+Estado al 2026-10-08 (rama `main`):
 - Funciona y está en el repo: un jugador, pantalla dividida (2 jugadores), en línea (Relay/Lobby, partida rápida, salas privadas/públicas), IA con personalidades y dificultad, caos de Ralph con dulces envueltos y martillo de Félix, corredores 3D sentados en sus karts (menú, selección, podio y en carrera), menú principal con recorrido de cámara, mini-mapa, controles táctiles y versión web.
-- Una sola pista: "Map_tgsd" (FBX de Sketchfab, ruta trazada a mano). Todo el código de carrera asume esa pista (ver "Pistas nuevas" abajo).
+- Dos pistas: "Circuito Sugar Rush" (FBX "Map_tgsd" de Sketchfab, ruta trazada a mano) y la piloto **"Bosque de gomitas"** (generada con Unity Splines, ver "Pistas con Splines"). Selector de pista en el menú principal y en la sala en línea.
 - **Versión web publicada** en Vercel: https://sugar-rush-sof12.vercel.app (alias https://sugar-rush-dusky.vercel.app). Pide código de acceso una vez por navegador (ver "Versión web"). **Nunca escribir el código en este archivo, en commits ni en mensajes que se suban**: vive solo en `web-access-code.txt` en el PC de la usuaria.
 
 Próximos pasos, en orden:
-1. **Esperar las pruebas de la usuaria de la web** (no verificadas aún por Claude en un navegador real, por falta de RAM):
-   - Portátil (Chrome/Edge): carga completa, pantalla de código, una carrera, control Logitech (el navegador lo detecta solo después de apretar un botón), FPS aceptables.
-   - Celular en horizontal: botones táctiles, "Acelerar solo" (Opciones), aviso "Gira tu teléfono" en vertical.
-   - En línea: crear sala en un dispositivo y unirse con el código desde otro (navegador ↔ navegador y navegador ↔ copia de Windows/Editor; todo usa Relay por WSS).
-   - Que el récord y el código aceptado sigan ahí al cerrar y volver a abrir (PlayerPrefs en IndexedDB del navegador).
-   - Si algo falla, pedir el mensaje que muestra la pantalla de carga ("No se pudo cargar el juego: ...") o la consola del navegador (F12).
-2. **Generador de pistas con Unity Splines + pista piloto "Bosque de gomitas"** (decisión confirmada: opción a, Splines, en vez del Racing Kit de Kenney). La piloto debe tener todo funcionando: IA, dulces, caos de Ralph, mini-mapa, pantalla dividida y en línea.
-3. **Selector de pista**: en el menú (un jugador y 2 jugadores) y en la sala en línea (elige el anfitrión).
-4. **ALTO: cuando la piloto esté lista, esperar a que la usuaria la pruebe** y diga si le gusta cómo se ve y cómo se maneja. Recién después hacer las demás, una por una: río de chocolate, volcán de soda, montaña de helado (temas que eligió). Ella puede buscar assets de decoración: revisar licencia (CC0 o CC BY, agregar a CREDITS.md), ≤ ~3k triángulos por pieza, GLB/FBX.
+1. **Pruebas de la web hechas por la usuaria (2026-10-07)**. Decidió terminar primero la pista nueva y después arreglar esto (antes del siguiente build web):
+   - Portátil: al crear sala en línea, Unity se cayó con `RuntimeError: remainder by zero` (un `%` entero por 0; en WebGL es fatal, en el Editor no). Buscar `%` con divisor que puede ser 0 en el flujo de crear sala / sala de espera.
+   - Portátil: al empezar la carrera sintió que su kart apareció lejos de la salida. Por la captura, es la parrilla normal: el jugador sale último, ~36 m detrás de la meta (`firstSlotBehindLine` 8 + 4 × `slotSpacing` 7). Propuesta: parrilla más compacta.
+   - Portátil: congelamientos/trabones momentáneos en carrera (¿GC, carga de audio, compilación de shaders?).
+   - Menú: el botón "2 jugadores (misma pantalla)" se corta (texto en 3 líneas); la página "Jugar en línea" se siente amontonada (más aire entre tarjetas y botones).
+   - Celular: no le gusta "Acelerar solo" siempre activo (le quita gracia); dejarlo apagado por defecto o con botón de acelerar.
+   - En línea portátil + celular: funciona, pero "necesita mejoras" (pedirle detalles cuando se retome).
+   - Récord: sin comentarios.
+2. ~~Generador de pistas con Splines + piloto "Bosque de gomitas"~~ y ~~selector de pista~~: hechos (2026-10-08). Verificado: 2 carreras completas de 2 vueltas solo con IA (todos terminan, 0 vueltas a la pista, Ralph rompe y reparan, vueltas de 31–37 s) y el selector en el menú. **Sin probar todavía**: pantalla dividida y en línea en la pista nueva, y la pista en la web.
+3. (vacío)
+4. **ALTO: la piloto está lista; esperar a que la usuaria la pruebe en el Editor o la copia de Windows** y diga si le gusta cómo se ve y cómo se maneja. Recién después hacer las demás, una por una: río de chocolate, volcán de soda, montaña de helado (temas que eligió). Ella puede buscar assets de decoración: revisar licencia (CC0 o CC BY, agregar a CREDITS.md), ≤ ~3k triángulos por pieza, GLB/FBX.
 5. Opcionales: medir FPS con "Pilotos en carrera" activado (copia de Windows `-sr-sp-test`); repetir la prueba en línea después de los cambios de Ralph (punto 6) y de los pilotos; iluminación baked.
 
-### Pistas nuevas: lo que hay que tener en cuenta (plan acordado)
-- Paquete `com.unity.splines` **todavía no instalado** (agregarlo al manifest; versión compatible con Unity 6000.3).
-- El generador (Editor, en el estilo de `SugarRushSetup`: todo por código, menú "Sugar Rush/...") debe producir desde el spline lo mismo que hoy sale de la pista FBX: malla de carretera + bordes + MeshCollider, `TrackPath` (puntos cada 4 m, índice 0 = meta, alturas), paredes (`TrackWalls`), parrilla de salida, arco de meta, `ChaosZoneSegments` + `CoinRows` para `RalphChaos`, datos del mini-mapa, puntos de saltos para la IA (`jumpSpeed`/`PlannedSpeed`) y tomas para `MenuCameraTour`. Decoración con instancing, pocas luces, neblina pastel (mismo presupuesto de rendimiento que la pista actual).
-- Hoy hay constantes atadas a la pista actual (p. ej. `Route`, `RouteOverrides`, `JumpLips`, `GuideWalls`, `ChaosZoneSegments` en `SugarRushSetup`, `RacerLineup` en el punto 139): pasar esos datos a un asset por pista en vez de constantes.
-- Probablemente una escena por pista (`SceneNames`, Build Settings) o una escena con la pista cargada según la elección; decidir al empezar.
-- Récords: hoy `best_<vueltas>` (`GameSettings.GetBestTime`); con varias pistas pasar a `best_<pista>_<vueltas>` sin perder los récords existentes de la pista actual.
-- En línea: la pista elegida va en `NetLobby`/`NetRace` desde el anfitrión → subir `OnlineSession.ProtocolVersion` (hoy `"sr2"`).
+### Pistas con Splines (cómo está hecho)
+- Catálogo: `Scripts/Core/Tracks.cs` (`Tracks.All`: id, escena, clave de nombre en `Loc`). Índice 0 = circuito original (`SceneNames.Race`). **Una escena por pista**; `SetupBuildSettings` agrega todas las que existan. Elegida en `GameSettings.Track` (PlayerPrefs `track`); `RaceManager.TrackIndex` sale del nombre de la escena; "Reiniciar" recarga la escena activa.
+- Récords: `best_<vueltas>` para la pista 0 (se conservan los viejos) y `best_<id>_<vueltas>` para las demás (`GameSettings.GetBestTime(track, laps)`).
+- En línea: `NetLobby.Track` (NetworkVariable, la escribe el anfitrión con `CycleTrack`); `StartRace` carga la escena de esa pista. `ProtocolVersion` = "sr3". Menú: `TrackPicker` en la página principal (foco + izquierda/derecha) y en la sala (el anfitrión cambia con flechas o con el foco en el selector; los invitados solo la ven).
+- Generador: `Scripts/Editor/SugarRushSetup.Tracks.cs` (partial de `SugarRushSetup`), menú "Sugar Rush/Tracks/Gummy Forest" (`BuildGummyForest`, también en `BuildAll`). Cada pista es un `SplineTrack`: knots (y = altura; knot 0 = meta, se maneja hacia el knot 1), medio ancho (6 m), semilla, color de cielo, función de materiales y función de decoración. El spline (AutoSmooth, cerrado) queda en la escena como `TrackSpline` para verlo; la fuente de verdad son los knots en el código.
+- Produce: carretera + bordillos a rayas + bermas (una malla, también es el collider), barandas visibles bajas, `TrackWalls` invisibles todo alrededor (no se puede salir de la carretera), suelo de alturas (celdas de 5 m, baja bajo la carretera y sube a colinas en el borde del mundo, con collider), decoración combinada en trozos de 150 m (un renderer por trozo, un submesh por material), `TrackPath` cada 4 m con las alturas del spline, meta (`BuildFinishLine`), caos de Ralph con zonas elegidas solas (`PickChaosZones`: los tramos más rectos y planos, separados) y 8 pares de dulces (`PickCoinRows`), y el resto de la escena (`AddRaceRig`: podio, cámara, RaceManager, HUD). Mallas en `Art/Tracks/<Carpeta>/` (se borran y rehacen en cada build), materiales en `Materials/Tracks/<Carpeta>/`, texturas `Art/Generated/GF_*`.
+- `SaveMeshAsset` actualiza mallas existentes en su lugar (no cambia el GUID): necesario porque `WrappedCandy` y los escombros los comparten varias escenas; los escombros de cada pista llevan prefijo propio (`Rubble_GummyForest_N`).
+- Bosque de gomitas: vuelta de 795 m, radio mínimo 12 m (las bermas miden 10,5 m desde el centro: no bajar de ahí o se doblan), recta de salida → curva amplia → subida → salto desde la cima (knots 6–7) → bajada → horquilla → tramo ondulado → meta. ~105k triángulos (carretera 17k, suelo 23k, decoración 64k). Decoración: árboles de gomita, chupetines de remolino, hongos, gotitas de goma, 7 ositos de goma gigantes mirando la carretera y 3 arcos de gusanos de goma.
+- Pistas siguientes (después del visto bueno de la usuaria): río de chocolate, volcán de soda, montaña de helado: nuevo `SplineTrack` + materiales + decoración + entrada en `Tracks.All` + nombre en `Loc`.
+- El menú principal sigue mostrando el circuito original de fondo (`MenuCameraTour`).
 - Después de agregar pistas, volver a hacer el build web y publicarlo (el tamaño crece; vigilar los 28 MB actuales).
+- Probar una carrera en la pista nueva: `AgentScripts/race_test_gf.sh N` (como `race_test.sh`, con `StartRaceGF.cs` / `ClrGF.cs`). Vistas: `AgentScripts/ShotsGF.cs` (cámara temporal, guarda PNG fuera de Assets).
 
 ## Stack
 - Unity 6000.3.25f1 LTS, URP (Universal 3D), Input System nuevo.
@@ -102,7 +108,7 @@ Fuera de `Assets/_SugarRush/`:
 - Mini-mapa en el HUD (`TrackMinimap`, abajo a la derecha sobre la velocidad; más chico en pantalla dividida): el circuito dibujado una vez con Painter2D desde `TrackPath`, la meta, los tramos rotos por Ralph y un punto por corredor con el color de su kart (el propio más grande). Solo los puntos se mueven cada cuadro.
 - Página "Jugar en línea": Partida rápida arriba y dos tarjetas: "¿Juegas con amigos? Crea una sala" (Privada/Pública + Crear sala) y "¿Te pasaron un código?" (campo con ejemplo "EJ: JT7PKQ" + Unirse). La sala de espera explica dónde escriben el código los amigos.
 - Controles: WASD/flechas, Espacio/Shift drift, R volver a la pista, Esc pausa; gamepad: gatillos/A, stick, RB/X drift, Y volver, Start pausa.
-- Pendiente: iluminación baked; pistas nuevas con Splines (opción a, confirmada; piloto "Bosque de gomitas", esperar que la usuaria la pruebe antes de hacer las demás: río de chocolate, volcán de soda, montaña de helado).
+- Pendiente: iluminación baked; las demás pistas con Splines después de que la usuaria pruebe la piloto (ver "Pistas con Splines").
 
 ## Versión web
 - Build: "Sugar Rush/Web Build" (`WebBuild.Build`): WebGL con Brotli sin fallback (Vercel manda `Content-Encoding: br` por `vercel.json`), nombres con hash + caché larga, data caching, stripping Minimal (los paquetes en línea usan reflexión), IL2CPP OptimizeSize, música a 22 kHz solo en web (el navegador la decodifica entera en RAM). Salida en `./Web` (ignorada por git) + `vercel.json` y `robots.txt` copiados desde `Tools/web/`.

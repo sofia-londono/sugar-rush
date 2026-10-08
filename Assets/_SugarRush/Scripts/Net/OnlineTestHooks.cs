@@ -52,7 +52,7 @@ namespace SugarRush
         {
             SceneManager.sceneLoaded += (scene, _) =>
             {
-                if (autopilot && scene.name == SceneNames.Race) StartCoroutine(Autopilot());
+                if (autopilot && Tracks.IsRaceScene(scene.name)) StartCoroutine(Autopilot());
             };
 
             if (localTest || spTest)
@@ -67,7 +67,7 @@ namespace SugarRush
                 if (localTest)
                     RaceSetup.SetLocalSplit(new[] { new RaceSetup.LocalPlayer { Kart = 0 }, new RaceSetup.LocalPlayer { Kart = 1 } });
                 else RaceSetup.SetSingle();
-                SceneManager.LoadScene(SceneNames.Race);
+                SceneManager.LoadScene(Tracks.Selected.Scene);
                 yield break;
             }
 

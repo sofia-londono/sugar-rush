@@ -20,6 +20,13 @@ namespace SugarRush
             ["menu.credits"] = ("Juego de fans sin fines de lucro · Modelos 3D (CC BY 4.0): RazyBerry, amogusstrikesback2, danigamer495channel, guinavarro.al y Kit7207 · Fuentes: Luckiest Guy (Apache 2.0) y Fredoka (OFL)",
                                 "Non-profit fan game · 3D models (CC BY 4.0): RazyBerry, amogusstrikesback2, danigamer495channel, guinavarro.al & Kit7207 · Fonts: Luckiest Guy (Apache 2.0) & Fredoka (OFL)"),
             ["menu.best"] = ("Récord ({0} vueltas): {1}", "Best ({0} laps): {1}"),
+            ["menu.track"] = ("Pista", "Track"),
+            ["lobby.trackHost"] = ("Tú eliges la pista", "You pick the track"),
+            ["lobby.trackGuest"] = ("El anfitrión elige la pista", "The host picks the track"),
+
+            // Tracks
+            ["track.sugarRush"] = ("Circuito Sugar Rush", "Sugar Rush Circuit"),
+            ["track.gummyForest"] = ("Bosque de gomitas", "Gummy Forest"),
 
             // Access code (web)
             ["gate.prompt"] = ("Escribe el código de acceso para jugar", "Type the access code to play"),

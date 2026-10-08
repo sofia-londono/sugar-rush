@@ -34,6 +34,8 @@ namespace SugarRush
         public int Laps { get; private set; }
         public bool IsPaused { get; private set; }
         public bool NewRecord { get; private set; }
+        /// <summary>Which track this race scene is (see <see cref="Tracks"/>).</summary>
+        public int TrackIndex { get; private set; }
         /// <summary>This machine's (first) player.</summary>
         public RaceProgress Player { get; private set; }
         /// <summary>Everyone playing on this machine: one normally, two in split screen.</summary>
@@ -56,6 +58,7 @@ namespace SugarRush
             Instance = this;
             Time.timeScale = 1f;
             Laps = GameSettings.Laps;
+            TrackIndex = Tracks.IndexOfScene(gameObject.scene.name);
         }
 
         void OnDestroy()
@@ -209,7 +212,7 @@ namespace SugarRush
             if (racer.isPlayer)
             {
                 // Records only count in a normal single-player race.
-                if (LocalPlayers.Count == 1) NewRecord = GameSettings.TrySetBestTime(Laps, RaceTime);
+                if (LocalPlayers.Count == 1) NewRecord = GameSettings.TrySetBestTime(TrackIndex, Laps, RaceTime);
                 // Let the computer drive the player's kart for the victory lap.
                 racer.GetComponent<PlayerKartInput>().enabled = false;
                 var ai = racer.gameObject.AddComponent<AIKartDriver>();
@@ -253,7 +256,7 @@ namespace SugarRush
         {
             SetPaused(false);
             if (IsOnline) { if (NetLobby.Instance) NetLobby.Instance.StartRace(); return; }
-            SceneManager.LoadScene(SceneNames.Race);
+            SceneManager.LoadScene(gameObject.scene.name);
         }
 
         public void QuitToMenu()

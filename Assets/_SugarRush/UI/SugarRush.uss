@@ -1324,3 +1324,43 @@
 .gate-input {
     width: 520px;
 }
+
+/* ---- Track picker: main page (over the 3D tour) and waiting room (cream panel) ---- */
+.track-picker {
+    align-items: center;
+    margin: -10px 0 14px 0;
+    padding: 2px 18px 6px 18px;
+    border-radius: 40px;
+    border-width: 4px;
+    border-color: rgba(255, 255, 255, 0);
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out-back;
+}
+
+.track-picker:focus {
+    background-color: rgba(255, 143, 199, 0.3);
+    border-color: var(--pink-light);
+    scale: 1.03 1.03;
+}
+
+.track-picker__label {
+    font-size: 26px;
+    color: #FFFFFF;
+    -unity-font: url("project://database/Assets/_SugarRush/UI/Fonts/Fredoka-Bold.ttf");
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: var(--lavender-dark);
+    margin-bottom: -4px;
+}
+
+.track-picker__name {
+    min-width: 460px;
+}
+
+.track-picker--panel {
+    margin: 0 0 8px 0;
+}
+
+.track-picker--panel > .track-picker__label {
+    color: var(--choco);
+    -unity-text-outline-width: 0;
+}

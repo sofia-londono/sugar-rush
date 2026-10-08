@@ -34,6 +34,8 @@ namespace SugarRush
 
         public KartRoster roster;
         public NetworkList<LobbyPlayer> Players;
+        /// <summary>The track the host picked (index into <see cref="Tracks.All"/>).</summary>
+        public readonly NetworkVariable<int> Track = new();
 
         int KartCount => roster ? roster.karts.Length : 5;
 
@@ -56,6 +58,7 @@ namespace SugarRush
 
             if (IsServer)
             {
+                Track.Value = GameSettings.Track;
                 AddPlayer(NetworkManager.LocalClientId, GameSettings.SelectedKart);
                 NetworkManager.OnClientConnectedCallback += OnClientConnected;
                 NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
@@ -156,12 +159,20 @@ namespace SugarRush
             return current;
         }
 
-        /// <summary>Host only: everyone goes to the race track (the room is locked meanwhile).</summary>
+        /// <summary>Host only: picks the next / previous track for everyone in the room.</summary>
+        public void CycleTrack(int direction)
+        {
+            if (!IsServer) return;
+            Track.Value = Tracks.Next(Track.Value, direction);
+            GameSettings.Track = Track.Value;
+        }
+
+        /// <summary>Host only: everyone goes to the chosen track (the room is locked meanwhile).</summary>
         public void StartRace()
         {
             if (!IsServer) return;
             OnlineSession.SetRoomLocked(true);
-            NetworkManager.SceneManager.LoadScene(SceneNames.Race, LoadSceneMode.Single);
+            NetworkManager.SceneManager.LoadScene(Tracks.Get(Track.Value).Scene, LoadSceneMode.Single);
         }
 
         /// <summary>Host only: everyone goes back to the waiting room (main menu scene).</summary>

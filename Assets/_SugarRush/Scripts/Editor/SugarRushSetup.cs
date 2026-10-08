@@ -15,7 +15,7 @@ namespace SugarRush.EditorTools
     /// One-click builders for the imported Sketchfab assets: kart materials, prefabs and roster,
     /// track import settings, the race scene and the main menu scene.
     /// </summary>
-    public static class SugarRushSetup
+    public static partial class SugarRushSetup
     {
         const string Root = "Assets/_SugarRush";
         const string KartFbx = Root + "/Art/Karts/SRstorybookracers.fbx";
@@ -100,6 +100,7 @@ namespace SugarRush.EditorTools
             log.AppendLine(SetupUIAssets());
             log.AppendLine(SetupCharacters());
             log.AppendLine(BuildRaceScene());
+            log.AppendLine(BuildGummyForest());
             log.AppendLine(BuildMenuScene());
             log.AppendLine(SetupBuildSettings());
             return log.ToString();
@@ -564,8 +565,18 @@ namespace SugarRush.EditorTools
 
             var path = BuildTrackPath(track);
             string wallInfo = BuildWalls(WeldedMesh.From(road), path);
-            BuildFinishLine(path);
-            string chaosInfo = BuildChaos(path);
+            BuildFinishLine(path, RoadHalfWidth);
+            string chaosInfo = BuildChaos(path, ChaosZoneSegments, CoinRows);
+            AddRaceRig(path);
+
+            EnsureFolder(Path.GetDirectoryName(RaceScenePath).Replace('\\', '/'));
+            EditorSceneManager.SaveScene(scene, RaceScenePath);
+            return $"Race scene: path={path.Count} pts / {path.Length:0} m | colliders={colliders} | {wallInfo} | {chaosInfo}";
+        }
+
+        /// <summary>Everything a race scene needs besides the track: podium, chase camera, RaceManager, HUD.</summary>
+        static void AddRaceRig(TrackPath path)
+        {
             BuildPodium();
 
             var cam = AddCamera(3000f);
@@ -585,10 +596,6 @@ namespace SugarRush.EditorTools
             var ui = AddUIDocument("RaceUI");
             ui.gameObject.AddComponent<RaceUI>().document = ui;
             AddEventSystem();
-
-            EnsureFolder(Path.GetDirectoryName(RaceScenePath).Replace('\\', '/'));
-            EditorSceneManager.SaveScene(scene, RaceScenePath);
-            return $"Race scene: path={path.Count} pts / {path.Length:0} m | colliders={colliders} | {wallInfo} | {chaosInfo}";
         }
 
         static TrackPath BuildTrackPath(GameObject track)
@@ -670,7 +677,7 @@ namespace SugarRush.EditorTools
             return path;
         }
 
-        static void BuildFinishLine(TrackPath path)
+        static void BuildFinishLine(TrackPath path, float roadHalfWidth)
         {
             var parent = new GameObject("FinishLine").transform;
             Vector3 start = path.Point(0);
@@ -684,7 +691,7 @@ namespace SugarRush.EditorTools
             var bannerMat = GetMaterial("Track/FinishBanner", "Universal Render Pipeline/Lit", Color.white, checker, new Vector2(14f, 1.5f));
             var caneMat = GetMaterial("Track/CandyCane", "Universal Render Pipeline/Lit", Color.white, stripes, new Vector2(2f, 6f));
 
-            float width = RoadHalfWidth * 2f + 1f;
+            float width = roadHalfWidth * 2f + 1f;
             var line = GameObject.CreatePrimitive(PrimitiveType.Quad);
             Object.DestroyImmediate(line.GetComponent<Collider>());
             line.name = "CheckeredLine";
@@ -694,7 +701,7 @@ namespace SugarRush.EditorTools
             line.transform.localScale = new Vector3(width, 2.4f, 1f);
             line.GetComponent<Renderer>().sharedMaterial = lineMat;
 
-            float postOffset = RoadHalfWidth + 1.2f;
+            float postOffset = roadHalfWidth + 1.2f;
             foreach (int side in new[] { -1, 1 })
             {
                 var post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -1092,7 +1099,7 @@ namespace SugarRush.EditorTools
             return hit;
         }
 
-        static string BuildChaos(TrackPath path)
+        static string BuildChaos(TrackPath path, int[] zoneSegments, (int seg, float lateral)[] coinRows, string rubblePrefix = "Rubble_")
         {
             var root = new GameObject("RalphChaos");
             var chaos = root.AddComponent<RalphChaos>();
@@ -1136,9 +1143,9 @@ namespace SugarRush.EditorTools
 
             // Zones: rubble on the narrower side of the road, the wider side stays open.
             var zones = new List<ChaosZone>();
-            for (int zi = 0; zi < ChaosZoneSegments.Length; zi++)
+            for (int zi = 0; zi < zoneSegments.Length; zi++)
             {
-                float d = path.DistanceAt(ChaosZoneSegments[zi]);
+                float d = path.DistanceAt(zoneSegments[zi]);
                 float left = float.MaxValue, right = float.MaxValue;
                 foreach (float off in new[] { -ChaosZoneHalfLength + 1f, 0f, ChaosZoneHalfLength - 1f })
                 {
@@ -1165,7 +1172,7 @@ namespace SugarRush.EditorTools
                 rubbleGo.transform.SetParent(root.transform, false);
                 rubbleGo.transform.SetPositionAndRotation(hit.point,
                     Quaternion.LookRotation(Vector3.ProjectOnPlane(path.DirectionAtDistance(d), hit.normal).normalized, hit.normal));
-                BuildRubbleMesh(rubbleGo, zi, zone.blockedMax - zone.blockedMin, ChaosZoneHalfLength * 2f - 1f, cube, cylinder, chocolate, crack, candies);
+                BuildRubbleMesh(rubbleGo, zi, rubblePrefix + zi, zone.blockedMax - zone.blockedMin, ChaosZoneHalfLength * 2f - 1f, cube, cylinder, chocolate, crack, candies);
                 zone.rubble = rubbleGo.transform;
                 // Ralph stands just past the outer edge of the rubble, facing the road, and pounds it.
                 float standLateral = blockRight ? zone.blockedMax + 0.7f : zone.blockedMin - 0.7f;
@@ -1179,7 +1186,7 @@ namespace SugarRush.EditorTools
 
             // Candies: pairs along the road, beside the racing line.
             var coinList = new List<Transform>();
-            foreach (var (seg, lateral) in CoinRows)
+            foreach (var (seg, lateral) in coinRows)
                 for (int k = 0; k < 2; k++)
                 {
                     float d = path.DistanceAt(seg) + k * 3.5f;
@@ -1334,17 +1341,14 @@ namespace SugarRush.EditorTools
             mesh.SetTriangles(wrap, 1);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            EnsureFolder(GeneratedDir);
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(mesh, path);
-            return mesh;
+            return SaveMeshAsset(mesh, path);
         }
 
         /// <summary>
         /// Smashed road, built once and combined into a single mesh: chocolate craters, cracks
         /// and chunks of candy over a <paramref name="width"/> x <paramref name="length"/> patch.
         /// </summary>
-        static void BuildRubbleMesh(GameObject go, int seed, float width, float length, Mesh cube, Mesh cylinder,
+        static void BuildRubbleMesh(GameObject go, int seed, string assetName, float width, float length, Mesh cube, Mesh cylinder,
             Material chocolate, Material crack, Material[] candies)
         {
             var rng = new System.Random(1234 + seed * 77);
@@ -1379,14 +1383,11 @@ namespace SugarRush.EditorTools
                 parts.Add(new CombineInstance { mesh = part, transform = Matrix4x4.identity });
                 mats.Add(mat);
             }
-            var mesh = new Mesh { name = $"Rubble_{seed}" };
+            var mesh = new Mesh { name = assetName };
             mesh.CombineMeshes(parts.ToArray(), false, false);
             foreach (var p in parts) Object.DestroyImmediate(p.mesh);
             mesh.RecalculateBounds();
-            string meshPath = $"{GeneratedDir}/Rubble_{seed}.asset";
-            EnsureFolder(GeneratedDir);
-            AssetDatabase.DeleteAsset(meshPath);
-            AssetDatabase.CreateAsset(mesh, meshPath);
+            mesh = SaveMeshAsset(mesh, $"{GeneratedDir}/{assetName}.asset");
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
         }
@@ -1526,11 +1527,14 @@ namespace SugarRush.EditorTools
         [MenuItem("Sugar Rush/7. Build Settings")]
         public static string SetupBuildSettings()
         {
-            EditorBuildSettings.scenes = new[]
+            // Menu first, then one race scene per track (generated ones only once they exist).
+            var scenes = new List<EditorBuildSettingsScene> { new(MenuScenePath, true) };
+            foreach (var t in Tracks.All)
             {
-                new EditorBuildSettingsScene(MenuScenePath, true),
-                new EditorBuildSettingsScene(RaceScenePath, true),
-            };
+                string scenePath = $"{Root}/Scenes/{t.Scene}.unity";
+                if (File.Exists(scenePath)) scenes.Add(new EditorBuildSettingsScene(scenePath, true));
+            }
+            EditorBuildSettings.scenes = scenes.ToArray();
             if (AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.DeleteAsset("Assets/Scenes");
 
             // Both quality levels (0 = Mobile/performance, 1 = PC/quality) on every platform, so the
@@ -1544,7 +1548,7 @@ namespace SugarRush.EditorTools
 
             PlayerSettings.productName = "Sugar Rush";
             PlayerSettings.runInBackground = true;
-            return "Build settings: MainMenu, Race | quality levels: " + string.Join(",", QualitySettings.names);
+            return $"Build settings: {scenes.Count} scenes | quality levels: " + string.Join(",", QualitySettings.names);
         }
 
         // ---------------------------------------------------------------- Scene helpers
