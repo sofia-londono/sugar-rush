@@ -20,6 +20,22 @@ Proyecto de fan sin fines de lucro. Sugar Rush y sus personajes son propiedad de
   (simplificados con `MeshDecimator`: Taffyta 24.784 → 7.500 triángulos, Candlehead 31.008 → 8.000, Rancis 22.540 → 7.500,
   Adorabeezle 29.648 → 7.500)
 
+### Decoración del Bosque de gomitas
+Importados con `PropImport` (Editor): mallas simplificadas, pintadas con la paleta pastel del juego y dibujadas con GPU instancing.
+- **Japanese bridge** — Aoerchemix (https://sketchfab.com/Aoerchemix), CC BY 4.0
+  https://sketchfab.com/3d-models/japanese-bridge-715951f5c3f74862a1ae74b899a2b51f (42.710 → 6.000 triángulos, colores pastel)
+- **Sugar Rush Tree** — ofihombre (https://sketchfab.com/ofihombre), CC BY 4.0
+  https://sketchfab.com/3d-models/sugar-rush-tree-1a8da3e6e3fb49d1846ad56d59a090e7 (con tintes de color)
+- **Simple Candy Canes** — Blender3D (https://sketchfab.com/Blender3D), CC BY 4.0
+  https://sketchfab.com/3d-models/simple-candy-canes-5063e5ccff8949918f221202df3a3977 (1.884 → 1.100 y 360 triángulos)
+- **CHOCOLATE EASTER BUNNY** — l o u i s (https://sketchfab.com/louis), CC BY 4.0
+  https://sketchfab.com/3d-models/chocolate-easter-bunny-99a623a4cbd84b8488050ac8162705b5 (24.464 → 4.000 triángulos)
+- **Cinnamon Delight** — dcm.3designer (https://sketchfab.com/dcm.3designer), CC BY 4.0
+  https://sketchfab.com/3d-models/cinnamon-delight-300aa2d66e4240538191f7632eb717e3 (9.998 → 900 triángulos)
+- **Red Gummy Bear** — autor y enlace PENDIENTES (descargado de Sketchfab como `red-gummy-bear.zip`; el ZIP no trae licencia) (3.148 → 1.100 y 280 triángulos, en 7 colores)
+- **Half Donuts** — autor y enlace PENDIENTES (`half-donuts.zip`) (3 medias donas, ~20.000 → 900 triángulos cada una; chispas como cajitas)
+- **Croissant Dolphins** — autor y enlace PENDIENTES (`croissant-dolphins.zip`; solo los delfines) (8.448 → 1.400 triángulos)
+
 ## Tipografías
 - **Luckiest Guy** — Astigmatic (licencia Apache 2.0) — títulos
   https://fonts.google.com/specimen/Luckiest+Guy (licencia en `Assets/_SugarRush/UI/Fonts/LuckiestGuy-LICENSE.txt`)
