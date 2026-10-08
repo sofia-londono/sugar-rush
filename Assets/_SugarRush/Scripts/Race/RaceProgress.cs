@@ -157,12 +157,19 @@ namespace SugarRush
             flat.y = 0f;
 
             fallen = height < -fallenDepth;
-            bool far = flat.magnitude > path.roadHalfWidth + offTrackMargin;
+            bool far = flat.magnitude > path.HalfWidthAt(PathDistance) + offTrackMargin;
             OffTrack = (fallen || far) && !Finished;
             OffTrackTime = OffTrack ? OffTrackTime + dt : 0f;
 
             if (OffTrack && OffTrackTime >= (fallen ? fallenReturnDelay : autoReturnDelay))
                 ReturnToTrack();
+        }
+
+        static bool HasRoadBelow(Vector3 point)
+        {
+            foreach (var h in Physics.RaycastAll(point + Vector3.up * 3f, Vector3.down, 6f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (h.normal.y >= 0.5f && Mathf.Abs(h.point.y - point.y) < 1.5f) return true;
+            return false;
         }
 
         bool IsSpotFree(Vector3 spot)
@@ -178,7 +185,19 @@ namespace SugarRush
         public void ReturnToTrack()
         {
             if (!hasAuthority) return;
+            // Back to the nearest point with road under it (not over a jump's gap). A kart that
+            // fell into a gap just behind it goes back before the ramp, to take the jump again.
             int seg = Segment;
+            bool crossedGap = false;
+            if (fallen)
+                for (int back = 0; back < 3; back++)
+                {
+                    if (!HasRoadBelow(path.Point(seg))) { crossedGap = true; break; }
+                    seg = path.Wrap(seg - 1);
+                }
+            if (!crossedGap) seg = Segment;
+            for (int back = 0; back < 8 && !HasRoadBelow(path.Point(seg)); back++) seg = path.Wrap(seg - 1);
+            if (crossedGap) seg = path.Wrap(seg - 6); // a run-up for the ramp
             Vector3 point = path.Point(seg);
             Vector3 dir = path.Direction(seg);
 

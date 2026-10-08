@@ -10,6 +10,8 @@ namespace SugarRush
     {
         public Vector3[] points;
         public float roadHalfWidth = 5f;
+        [Tooltip("Optional half width at each point (tracks with narrow stretches); empty = roadHalfWidth everywhere.")]
+        public float[] halfWidths;
 
         float[] cumulative;
         float length;
@@ -63,6 +65,10 @@ namespace SugarRush
         }
 
         public Vector3 DirectionAtDistance(float d) => Direction(SegmentAtDistance(d));
+
+        /// <summary>Drivable half width of the road at a distance along the path.</summary>
+        public float HalfWidthAt(float d) =>
+            halfWidths != null && halfWidths.Length == Count ? halfWidths[SegmentAtDistance(d)] : roadHalfWidth;
 
         /// <summary>
         /// Closest segment to a position. With a hint, only nearby segments are searched so

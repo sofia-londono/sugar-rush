@@ -169,7 +169,7 @@ namespace SugarRush
             var chaos = RalphChaos.Instance;
             if (chaos && chaos.LaneHint(progress, s, out float hint))
             {
-                float roadLimit = Mathf.Max(0f, path.roadHalfWidth - 1f);
+                float roadLimit = Mathf.Max(0f, path.HalfWidthAt(s) - 1f);
                 return Mathf.Clamp(hint, -roadLimit, roadLimit);
             }
 
@@ -198,7 +198,11 @@ namespace SugarRush
                 else if (blockLane.HasValue) lane = Mathf.Lerp(lane, blockLane.Value, aggression * 0.7f);
             }
 
-            float limit = Mathf.Max(0f, path.roadHalfWidth - 1.5f);
+            // Caramel puddles and gummy bears at the edge: pass on the open side.
+            var hazards = TrackHazards.Instance;
+            if (hazards && hazards.LaneHint(s, lane, out float avoid)) lane = avoid;
+
+            float limit = Mathf.Max(0f, path.HalfWidthAt(s) - 1.5f);
             return Mathf.Clamp(lane, -limit, limit);
         }
 

@@ -20,7 +20,16 @@ namespace SugarRush.EditorTools
         {
             public string Id, Folder, Scene;
             public Vector3[] Knots;
+            /// <summary>Widest half width of the road (the nominal one; profiles are drawn for it).</summary>
             public float HalfWidth = 6f;
+            /// <summary>Optional half width at each knot (narrow stretches), blended along the lap.</summary>
+            public float[] Widths;
+            /// <summary>Optional banking at each knot, in degrees: the outside of the turn is raised.</summary>
+            public float[] Banks;
+            /// <summary>Jump gaps: the road stops at the point nearest each XZ spot (the lip) for the given length (m).</summary>
+            public (Vector2 lip, float length)[] Gaps;
+            /// <summary>Caramel puddles and edge gummy bears, as fractions of the lap.</summary>
+            public float[] Puddles, EdgeBears;
             /// <summary>Height of the open ground around the track (the road is at the knots' heights).</summary>
             public float GroundLevel = -1.5f;
             public int Seed = 1;
@@ -61,9 +70,11 @@ namespace SugarRush.EditorTools
         // ---------------------------------------------------------------- Gummy Forest
 
         /// <summary>
-        /// "Bosque de gomitas": start straight, a wide right-hander into a climb, a jump off the
-        /// hilltop, a fast descent into a hairpin, a wiggly southern stretch and back to the line.
-        /// Gummy trees, gumdrops, mushrooms, gummy bears and gummy-worm arches.
+        /// "Bosque de gomitas" (~1.07 km): start straight, a fast banked right-hander, the climb to
+        /// the hilltop and jump 1 off its lip, banked hairpin 1, a narrow chicane through the
+        /// forest, the Japanese bridge over the chocolate lake, a kicker and jump 2 over a gap
+        /// above a chocolate river (too slow and you fall in), banked hairpin 2 and back to the line.
+        /// Caramel puddles and giant gummy bears on the edges make the line harder.
         /// </summary>
         static readonly SplineTrack GummyForest = new()
         {
@@ -71,30 +82,61 @@ namespace SugarRush.EditorTools
             Folder = "GummyForest",
             Scene = "GummyForest_Track",
             Seed = 7,
+            HalfWidth = 6.5f,
             Knots = new[]
             {
-                new Vector3(0f, 0f, 0f),        // start / finish
-                new Vector3(0f, 0f, 70f),
-                new Vector3(20f, 0.5f, 115f),
-                new Vector3(65f, 2f, 130f),
-                new Vector3(105f, 5f, 105f),    // climbing
-                new Vector3(120f, 9f, 62f),
-                new Vector3(113f, 12f, 24f),    // hilltop lip
-                new Vector3(111f, 8.5f, 9f),    // steep drop: karts fly off the lip
-                new Vector3(125f, 5f, -25f),
-                new Vector3(160f, 2f, -50f),
-                new Vector3(170f, 1f, -100f),   // hairpin
-                new Vector3(140f, 1f, -135f),
-                new Vector3(100f, 2f, -120f),
-                new Vector3(70f, 3f, -145f),
-                new Vector3(30f, 2f, -150f),
-                new Vector3(-5f, 1f, -125f),
-                new Vector3(-15f, 0f, -80f),
-                new Vector3(-5f, 0f, -35f),
+                new Vector3(0f, 0f, 0f),        // 0 start / finish
+                new Vector3(0f, 0f, 80f),
+                new Vector3(25f, 1f, 135f),     // 2 fast banked right-hander
+                new Vector3(80f, 3f, 160f),
+                new Vector3(135f, 5f, 140f),
+                new Vector3(165f, 8f, 100f),    // 5 climbing
+                new Vector3(170f, 12f, 55f),    // 6 hilltop lip: jump 1
+                new Vector3(168f, 8.5f, 40f),   // 7 steep drop
+                new Vector3(160f, 6f, 0f),
+                new Vector3(158f, 4f, -45f),
+                new Vector3(159f, 3f, -75f),    // 10 hairpin 1: an arc of radius 19 around (140, -75)
+                new Vector3(153.4f, 2.8f, -88.4f),
+                new Vector3(140f, 2.6f, -94f),
+                new Vector3(126.6f, 2.5f, -88.4f),
+                new Vector3(121f, 2.5f, -75f),
+                new Vector3(118f, 3f, -40f),    // 13 narrow chicane
+                new Vector3(108f, 4f, -15f),
+                new Vector3(118f, 5f, 10f),
+                new Vector3(102f, 4f, 35f),
+                new Vector3(80f, 2f, 55f),
+                new Vector3(45f, 1f, 45f),
+                new Vector3(48f, 0.5f, 10f),    // 19 Japanese bridge over the lake
+                new Vector3(50f, 0.8f, -12f),   // 20 kicker
+                new Vector3(52f, 3f, -29f),     // 21 crest: jump 2 over the river
+                new Vector3(54f, 1f, -50f),     // 22 landing
+                new Vector3(45f, 0f, -92f),     // hairpin 2: an arc of radius 18 around (27, -92)
+                new Vector3(39.7f, -0.3f, -104.7f),
+                new Vector3(27f, -0.5f, -110f),
+                new Vector3(14.3f, -0.3f, -104.7f),
+                new Vector3(9f, 0f, -92f),
+                new Vector3(2f, 0f, -45f),
             },
-            BridgeNear = new Vector2(-10f, -58f),
+            Widths = new[]
+            {
+                6.5f, 6.5f, 6.5f, 6.5f, 6.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f,
+                4.2f, 4f, 4f, 4.2f, 5.5f, 5.5f, 5.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6.5f,
+            },
+            Banks = new[]
+            {
+                0f, 0f, 10f, 12f, 10f, 4f, 0f, 0f, 0f, 4f, 12f, 15f, 15f, 15f, 12f,
+                0f, 6f, 6f, 4f, 6f, 6f, 0f, 0f, 0f, 0f, 10f, 14f, 14f, 14f, 10f, 4f,
+            },
+            Gaps = new[] { (new Vector2(51.6f, -25f), 7f) },
+            Puddles = new[] { 0.12f, 0.33f, 0.5f, 0.66f, 0.9f },
+            EdgeBears = new[] { 0.08f, 0.27f, 0.45f, 0.6f, 0.75f, 0.95f },
+            BridgeNear = new Vector2(48f, 10f),
             BridgeLength = 30f,
-            Lake = new[] { new Vector3(-11f, -58f, 13f), new Vector3(-44f, -60f, 26f) },
+            Lake = new[]
+            {
+                new Vector3(48f, 10f, 11f), new Vector3(75f, 15f, 20f),                         // lake under the bridge
+                new Vector3(37f, -29f, 6f), new Vector3(52f, -29f, 6f), new Vector3(67f, -29f, 6f), // river under jump 2
+            },
             Materials = GummyForestMaterials,
             Decorate = DecorateGummyForest,
         };
@@ -119,8 +161,55 @@ namespace SugarRush.EditorTools
             public Rect Bounds;
             public System.Random Rng;
             public Materials Mats;
-            /// <summary>Centre-line samples where the road is not drawn (the bridge carries it there).</summary>
+            /// <summary>Centre-line samples where the road is not drawn (bridge, jump gaps).</summary>
             public bool[] Hidden;
+            /// <summary>Centre-line samples with nothing to drive on (jump gaps).</summary>
+            public bool[] NoGround;
+            /// <summary>Half width and signed banking (radians, + = right side up) at each centre sample.</summary>
+            public float[] Width, Bank;
+            /// <summary>Distances (m) the chaos zones keep away from (bridge, gaps, hazards).</summary>
+            public readonly List<float> Busy = new();
+
+            /// <summary>The road's own right and up at a sample (tilted on banked turns).</summary>
+            public void Frame(int i, out Vector3 right, out Vector3 up)
+            {
+                float a = Bank != null ? Bank[i] : 0f;
+                right = Right[i] * Mathf.Cos(a) + Vector3.up * Mathf.Sin(a);
+                up = Vector3.up * Mathf.Cos(a) - Right[i] * Mathf.Sin(a);
+            }
+
+            /// <summary>
+            /// A cross-section point at sample i. Profiles are drawn for the nominal half width:
+            /// the road part stretches to the local width, everything past the edge keeps its size.
+            /// Up to the rail the point follows the banking; beyond it (shoulders) it is level.
+            /// </summary>
+            public Vector3 ProfilePoint(int i, Vector2 q)
+            {
+                float hw0 = Design.HalfWidth, w = Width != null ? Width[i] : hw0;
+                float ax = Mathf.Abs(q.x), sign = q.x < 0f ? -1f : 1f;
+                float x = ax <= hw0 ? q.x * w / hw0 : sign * (ax - hw0 + w);
+                float edge = w + CurbWidth + RailWidth + 0.01f;
+                Frame(i, out var right, out var up);
+                if (Mathf.Abs(x) <= edge) return Center[i] + right * x + up * q.y;
+                return Center[i] + right * (sign * edge) + Right[i] * (sign * (Mathf.Abs(x) - edge)) + Vector3.up * q.y;
+            }
+
+            /// <summary>Road point at a real sideways offset (metres from the centre line).</summary>
+            public Vector3 RoadPoint(int i, float lateral, float height = 0f)
+            {
+                Frame(i, out var right, out var up);
+                return Center[i] + right * lateral + up * height;
+            }
+
+            public bool BusyNear(float d, float range)
+            {
+                foreach (float b in Busy)
+                {
+                    float gap = Mathf.Abs(Mathf.Repeat(d - b + Length * 0.5f, Length) - Length * 0.5f);
+                    if (gap < range) return true;
+                }
+                return false;
+            }
             readonly List<(Vector3 pos, float radius)> occupied = new();
             readonly Dictionary<(int, int, Mesh, int, Material, bool), List<Matrix4x4>> props = new();
 
@@ -130,6 +219,9 @@ namespace SugarRush.EditorTools
                 int i = Mathf.FloorToInt(Mathf.Repeat(d, Length) / Length * Hidden.Length) % Hidden.Length;
                 return Hidden[i];
             }
+
+            /// <summary>Busy for Ralph: bridge, gaps, hazards (±15 m).</summary>
+            public bool ExcludedForChaos(float d) => HiddenAtDistance(d) || BusyNear(d, 15f);
 
             /// <summary>0 outside the chocolate lake, rising to 1 a few metres inside its shore.</summary>
             public float LakeFactor(float x, float z)
@@ -229,11 +321,11 @@ namespace SugarRush.EditorTools
                 float d = RoadDistance(new Vector2(x, z), out float roadY, out _);
                 float near = Design.HalfWidth + ShoulderWidth;
                 float h;
-                if (d <= near) h = roadY - 1.5f;
+                if (d <= near) h = roadY - 2.2f;
                 else
                 {
                     float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - near) / 35f));
-                    h = Mathf.Lerp(roadY - 1.2f, Natural(x, z), k);
+                    h = Mathf.Lerp(roadY - 1.8f, Natural(x, z), k);
                 }
                 // Chocolate lake: a shore just above the surface, then the basin.
                 float lake = LakeFactor(x, z);
@@ -353,6 +445,7 @@ namespace SugarRush.EditorTools
             b.Dist = new List<float>(b.Center.Count);
             int n = b.Center.Count;
             float minRadius = float.MaxValue;
+            Vector3 minRadiusAt = Vector3.zero;
             for (int i = 0; i < n; i++)
             {
                 Vector3 dir = Vector3.ProjectOnPlane(b.Center[(i + 1) % n] - b.Center[(i - 1 + n) % n], Vector3.up).normalized;
@@ -360,11 +453,12 @@ namespace SugarRush.EditorTools
                 b.Dist.Add(b.Length);
                 b.Length += Vector3.Distance(b.Center[i], b.Center[(i + 1) % n]);
             }
+            ApplyWidthsAndBanks(b);
             for (int i = 0; i < n; i++)
             {
                 // Turning radius over 6 m: the shoulders fold over themselves below ShoulderWidth + road.
                 float angle = Vector3.Angle(b.Right[(i - 3 + n) % n], b.Right[(i + 3) % n]) * Mathf.Deg2Rad;
-                if (angle > 1e-4f) minRadius = Mathf.Min(minRadius, 6f / angle);
+                if (angle > 1e-4f && 6f / angle < minRadius) { minRadius = 6f / angle; minRadiusAt = b.Center[i]; }
             }
 
             Vector2 lo = new(float.MaxValue, float.MaxValue), hi = new(float.MinValue, float.MinValue);
@@ -375,7 +469,10 @@ namespace SugarRush.EditorTools
             b.Root = rootGo.transform;
             b.Mats = design.Materials(b);
 
+            b.Hidden = new bool[n];
+            b.NoGround = new bool[n];
             string bridgeInfo = PlaceBridge(b, pathPoints);
+            string gapInfo = MarkGaps(b);
             int roadTris = BuildRoad(b);
             int groundTris = BuildGround(b);
             BuildLake(b);
@@ -386,13 +483,16 @@ namespace SugarRush.EditorTools
             var path = pathGo.AddComponent<TrackPath>();
             path.points = pathPoints.ToArray();
             path.roadHalfWidth = design.HalfWidth;
+            path.halfWidths = new float[pathPoints.Count];
+            for (int k = 0; k < pathPoints.Count; k++) path.halfWidths[k] = b.Width[Mathf.RoundToInt(k * PathSpacing) % n];
+            string hazardInfo = BuildHazards(b, path);
 
             design.Decorate(b);
             int decorTris = b.FlushDecor();
             int propTris = b.FlushProps(out int propCount);
 
-            BuildFinishLine(path, design.HalfWidth);
-            var zones = PickChaosZones(path, 3, b.HiddenAtDistance);
+            BuildFinishLine(path, b.Width[0]);
+            var zones = PickChaosZones(path, 3, b.ExcludedForChaos);
             string chaosInfo = BuildChaos(path, zones, PickCoinRows(path, zones), $"Rubble_{design.Folder}_");
             AddRaceRig(path);
             var cam = Object.FindFirstObjectByType<KartCamera>().GetComponent<Camera>();
@@ -402,7 +502,7 @@ namespace SugarRush.EditorTools
             EditorSceneManager.SaveScene(scene, scenePath);
             AssetDatabase.SaveAssets();
             SetupBuildSettings();
-            return $"{design.Folder}: lap {path.Length:0} m, {path.Count} pts, min radius {minRadius:0.0} m | tris road {roadTris}, ground {groundTris}, decor {decorTris}, props {propCount} instances / {propTris} tris | {bridgeInfo} | zones {string.Join(",", zones)} | {chaosInfo}";
+            return $"{design.Folder}: lap {path.Length:0} m, {path.Count} pts, min radius {minRadius:0.0} m at ({minRadiusAt.x:0},{minRadiusAt.z:0}) | tris road {roadTris}, ground {groundTris}, decor {decorTris}, props {propCount} instances / {propTris} tris | {bridgeInfo} | {gapInfo} | {hazardInfo} | zones {string.Join(",", zones)} | {chaosInfo}";
         }
 
         /// <summary>Evenly spaced points along a closed polyline (3D distance), starting at its first point.</summary>
@@ -433,7 +533,7 @@ namespace SugarRush.EditorTools
         /// <paramref name="worldUV"/> the UV is world XZ / 10 (matches the ground texture).
         /// </summary>
         static void Extrude(TrackBuild b, Vector2[] profile, float vPerMetre, List<Vector3> verts, List<Vector2> uvs, List<int> tris,
-            int step = 1, bool worldUV = false, bool skipHidden = false)
+            int step = 1, bool worldUV = false, bool[] skip = null)
         {
             int n = b.Center.Count, cols = profile.Length, start = verts.Count;
             var u = new float[cols];
@@ -446,18 +546,17 @@ namespace SugarRush.EditorTools
             foreach (int i in rows)
             {
                 int k = i % n;
-                Vector3 c = b.Center[k], r = b.Right[k];
                 float v = (i >= n ? b.Length : b.Dist[k]) * vPerMetre;
                 for (int j = 0; j < cols; j++)
                 {
-                    Vector3 p = c + r * profile[j].x + Vector3.up * profile[j].y;
+                    Vector3 p = b.ProfilePoint(k, profile[j]);
                     verts.Add(p);
                     uvs.Add(worldUV ? new Vector2(p.x, p.z) / 10f : new Vector2(u[j], v));
                 }
             }
             for (int row = 0; row + 1 < rows.Count; row++)
             {
-                if (skipHidden && b.Hidden != null && (b.Hidden[rows[row] % n] || b.Hidden[rows[row + 1] % n])) continue;
+                if (skip != null && (skip[rows[row] % n] || skip[rows[row + 1] % n])) continue;
                 for (int j = 0; j + 1 < cols; j++)
                 {
                     int a = start + row * cols + j, c = a + cols;
@@ -488,11 +587,13 @@ namespace SugarRush.EditorTools
             var roadProfile = new[] { new Vector2(-hw, 0f), new Vector2(hw, 0f) };
             var curbLeft = new[] { new Vector2(-curb, 0.1f), new Vector2(-hw, 0.02f) };
             var curbRight = new[] { new Vector2(hw, 0.02f), new Vector2(curb, 0.1f) };
-            Extrude(b, roadProfile, 0.1f, verts, uvs, road, skipHidden: true);
-            Extrude(b, curbLeft, 1f / 3f, verts, uvs, curbs, skipHidden: true);
-            Extrude(b, curbRight, 1f / 3f, verts, uvs, curbs, skipHidden: true);
-            Extrude(b, new[] { new Vector2(-shoulder, -ShoulderDrop), new Vector2(-curb, 0.1f) }, 0f, verts, uvs, grass, worldUV: true, skipHidden: true);
-            Extrude(b, new[] { new Vector2(curb, 0.1f), new Vector2(shoulder, -ShoulderDrop) }, 0f, verts, uvs, grass, worldUV: true, skipHidden: true);
+            Extrude(b, roadProfile, 0.1f, verts, uvs, road, skip: b.Hidden);
+            Extrude(b, curbLeft, 1f / 3f, verts, uvs, curbs, skip: b.Hidden);
+            Extrude(b, curbRight, 1f / 3f, verts, uvs, curbs, skip: b.Hidden);
+            // Shoulders, with a steep skirt that always reaches below the ground (banked turns lift one edge).
+            float skirt = shoulder + 2.5f;
+            Extrude(b, new[] { new Vector2(-skirt, -4.5f), new Vector2(-shoulder, -ShoulderDrop), new Vector2(-curb, 0.1f) }, 0f, verts, uvs, grass, worldUV: true, skip: b.Hidden);
+            Extrude(b, new[] { new Vector2(curb, 0.1f), new Vector2(shoulder, -ShoulderDrop), new Vector2(skirt, -4.5f) }, 0f, verts, uvs, grass, worldUV: true, skip: b.Hidden);
             var mesh = SaveMeshAsset(NewMesh("Road", verts, uvs, road, curbs, grass), $"{b.AssetDir}/Road.asset");
             var go = new GameObject("Road");
             go.transform.SetParent(b.Root, false);
@@ -504,9 +605,9 @@ namespace SugarRush.EditorTools
             var colVerts = new List<Vector3>();
             var colUvs = new List<Vector2>();
             var colTris = new List<int>();
-            Extrude(b, roadProfile, 0f, colVerts, colUvs, colTris);
-            Extrude(b, curbLeft, 0f, colVerts, colUvs, colTris);
-            Extrude(b, curbRight, 0f, colVerts, colUvs, colTris);
+            Extrude(b, roadProfile, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
+            Extrude(b, curbLeft, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
+            Extrude(b, curbRight, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
             var colMesh = SaveMeshAsset(NewMesh("RoadCollider", colVerts, colUvs, colTris), $"{b.AssetDir}/RoadCollider.asset");
             var colGo = new GameObject("RoadCollider");
             colGo.transform.SetParent(b.Root, false);
@@ -526,7 +627,7 @@ namespace SugarRush.EditorTools
                 new[] { new Vector2(-outer, top), new Vector2(-inner, top) },
                 new[] { new Vector2(-inner, top), new Vector2(-inner, 0.05f) },
             };
-            foreach (var face in faces) Extrude(b, face, 1f / 3f, railVerts, railUvs, railTris, skipHidden: true);
+            foreach (var face in faces) Extrude(b, face, 1f / 3f, railVerts, railUvs, railTris, skip: b.Hidden);
             var railMesh = SaveMeshAsset(NewMesh("Rails", railVerts, railUvs, railTris), $"{b.AssetDir}/Rails.asset");
             var rails = new GameObject("Rails");
             rails.transform.SetParent(b.Root, false);
@@ -536,15 +637,15 @@ namespace SugarRush.EditorTools
             return (road.Count + curbs.Count + grass.Count + railTris.Count) / 3;
         }
 
-        /// <summary>Invisible walls just past the rails, all the way round (karts can't leave the road).</summary>
+        /// <summary>Invisible walls just past the rails, all the way round and 6 m tall (karts can't leave the road, not even flying off a jump).</summary>
         static void BuildTrackWalls(TrackBuild b)
         {
             float x = b.Design.HalfWidth + CurbWidth + 0.1f; // just inside the rail
             var verts = new List<Vector3>();
             var uvs = new List<Vector2>();
             var tris = new List<int>();
-            Extrude(b, new[] { new Vector2(x, -1f), new Vector2(x, 2.5f) }, 0f, verts, uvs, tris, 2);
-            Extrude(b, new[] { new Vector2(-x, 2.5f), new Vector2(-x, -1f) }, 0f, verts, uvs, tris, 2);
+            Extrude(b, new[] { new Vector2(x, -1f), new Vector2(x, 6f) }, 0f, verts, uvs, tris, 2);
+            Extrude(b, new[] { new Vector2(-x, 6f), new Vector2(-x, -1f) }, 0f, verts, uvs, tris, 2);
             var mesh = SaveMeshAsset(NewMesh("TrackWalls", verts, uvs, tris), $"{b.AssetDir}/TrackWalls.asset");
             var walls = new GameObject("TrackWalls");
             walls.AddComponent<MeshCollider>().sharedMesh = mesh;
@@ -600,7 +701,7 @@ namespace SugarRush.EditorTools
             }
             candidates.Sort((x, y) => x.score.CompareTo(y.score));
             var picked = new List<int>();
-            float separation = path.Length / (count + 1);
+            float separation = path.Length / (count + 2);
             foreach (var (seg, _) in candidates)
             {
                 if (picked.Count == count) break;
@@ -632,6 +733,199 @@ namespace SugarRush.EditorTools
             return rows.ToArray();
         }
 
+        /// <summary>Centre sample nearest an XZ spot.</summary>
+        static int NearestSample(TrackBuild b, Vector2 xz)
+        {
+            int best = 0;
+            float bestD = float.MaxValue;
+            for (int i = 0; i < b.Center.Count; i++)
+            {
+                float d = (new Vector2(b.Center[i].x, b.Center[i].z) - xz).sqrMagnitude;
+                if (d < bestD) { bestD = d; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Width and banking per centre sample: knot values blended along the lap and smoothed;
+        /// banking leans into the turn (outside edge up) and fades out on straights.
+        /// </summary>
+        static void ApplyWidthsAndBanks(TrackBuild b)
+        {
+            var d = b.Design;
+            int n = b.Center.Count, knots = d.Knots.Length;
+            var at = new int[knots];
+            for (int k = 0; k < knots; k++) at[k] = NearestSample(b, new Vector2(d.Knots[k].x, d.Knots[k].z));
+            float[] Blend(float[] values, float fallback)
+            {
+                var result = new float[n];
+                for (int i = 0; i < n; i++) result[i] = fallback;
+                if (values == null) return result;
+                for (int k = 0; k < knots; k++)
+                {
+                    int a = at[k], len = ((at[(k + 1) % knots] - a) % n + n) % n;
+                    if (len == 0) len = n;
+                    for (int j = 0; j < len; j++)
+                        result[(a + j) % n] = Mathf.Lerp(values[k], values[(k + 1) % knots], j / (float)len);
+                }
+                // Smooth over +-10 m.
+                var smooth = new float[n];
+                for (int i = 0; i < n; i++)
+                {
+                    float sum = 0f;
+                    for (int j = -10; j <= 10; j++) sum += result[(i + j + n) % n];
+                    smooth[i] = sum / 21f;
+                }
+                return smooth;
+            }
+            b.Width = Blend(d.Widths, d.HalfWidth);
+            var bankDeg = Blend(d.Banks, 0f);
+            b.Bank = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 before = b.Center[i] - b.Center[(i - 8 + n) % n], after = b.Center[(i + 8) % n] - b.Center[i];
+                float turn = Vector3.Cross(Vector3.ProjectOnPlane(before, Vector3.up).normalized, Vector3.ProjectOnPlane(after, Vector3.up).normalized).y;
+                // Right turn (turn > 0): the right side is the inside, so it goes down.
+                float lean = -Mathf.Sign(turn) * Mathf.Clamp01(Mathf.Abs(turn) / 0.17f);
+                b.Bank[i] = bankDeg[i] * lean * Mathf.Deg2Rad;
+            }
+        }
+
+        /// <summary>Jump gaps: from each lip the road (and what karts drive on) stops for the gap length.</summary>
+        static string MarkGaps(TrackBuild b)
+        {
+            var d = b.Design;
+            if (d.Gaps == null) return "gaps 0";
+            int n = b.Center.Count;
+            foreach (var (lip, length) in d.Gaps)
+            {
+                int start = NearestSample(b, lip);
+                for (int k = 1; k <= Mathf.RoundToInt(length); k++)
+                {
+                    int i = (start + k) % n;
+                    b.Hidden[i] = true;
+                    b.NoGround[i] = true;
+                }
+                // The lip and the landing: no hazards where karts are in the air or just came down blind.
+                b.Busy.Add(b.Dist[start]);
+                b.Busy.Add(Mathf.Repeat(b.Dist[start] + length + 20f, b.Length));
+            }
+            return $"gaps {d.Gaps.Length}";
+        }
+
+        /// <summary>
+        /// Sticky caramel puddles (one side of the road, the other stays free) and giant gummy
+        /// bears sitting on the road edge with real colliders. Both go into a TrackHazards, which
+        /// slows karts in caramel and tells the AI where to steer.
+        /// </summary>
+        static string BuildHazards(TrackBuild b, TrackPath path)
+        {
+            var d = b.Design;
+            int n = b.Center.Count;
+            var spots = new List<TrackHazards.Spot>();
+            var root = new GameObject("TrackHazards");
+            var hazards = root.AddComponent<TrackHazards>();
+            hazards.path = path;
+
+            // Slide a spot forward until it is clear of the start, the bridge, the gaps and other hazards.
+            int Free(float fraction, float range)
+            {
+                int i = Mathf.FloorToInt(fraction * n) % n;
+                for (int tries = 0; tries < 200; tries++, i = (i + 3) % n)
+                {
+                    float dist = b.Dist[i];
+                    if (dist < 50f || dist > b.Length - 30f) continue;
+                    if (b.HiddenAtDistance(dist) || b.BusyNear(dist, range)) continue;
+                    return i;
+                }
+                return -1;
+            }
+
+            // Caramel puddles: irregular glossy blobs lying on the (maybe banked) road.
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            int puddles = 0;
+            if (d.Puddles != null)
+                foreach (float f in d.Puddles)
+                {
+                    int i = Free(f, 22f);
+                    if (i < 0) continue;
+                    float side = puddles % 2 == 0 ? 1f : -1f;
+                    float radius = b.R(2.1f, 2.6f);
+                    float lateral = side * b.Width[i] * 0.35f;
+                    Vector3 centre = b.RoadPoint(i, lateral, 0.035f);
+                    b.Frame(i, out var right, out var up);
+                    Vector3 forward = Vector3.Cross(right, up);
+                    int c0 = verts.Count;
+                    verts.Add(centre);
+                    uvs.Add(Vector2.zero);
+                    const int sides = 18;
+                    float wobble = b.R(0f, 6f);
+                    for (int k = 0; k <= sides; k++)
+                    {
+                        float a = k / (float)sides * Mathf.PI * 2f;
+                        float r = radius * (1f + 0.16f * Mathf.Sin(a * 3f + wobble) + 0.08f * Mathf.Sin(a * 5f + wobble * 2f));
+                        verts.Add(centre + (right * Mathf.Cos(a) * 1.15f + forward * Mathf.Sin(a)) * r);
+                        uvs.Add(Vector2.zero);
+                    }
+                    for (int k = 0; k < sides; k++) tris.AddRange(new[] { c0, c0 + 2 + k, c0 + 1 + k });
+                    spots.Add(new TrackHazards.Spot { center = centre, radius = radius * 1.05f, distance = b.Dist[i], lateral = lateral, sticky = true });
+                    b.Busy.Add(b.Dist[i]);
+                    puddles++;
+                }
+            if (verts.Count > 0)
+            {
+                var mesh = SaveMeshAsset(NewMesh("Caramel", verts, uvs, tris), $"{b.AssetDir}/Caramel.asset");
+                var caramel = GetMaterial($"{b.MaterialDir}/Caramel", "Universal Render Pipeline/Lit", new Color(1f, 0.68f, 0.3f));
+                caramel.SetFloat("_Smoothness", 0.95f);
+                caramel.EnableKeyword("_EMISSION");
+                caramel.SetColor("_EmissionColor", new Color(0.35f, 0.18f, 0.04f));
+                caramel.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                var go = new GameObject("CaramelPuddles");
+                go.transform.SetParent(b.Root, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = caramel;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+
+            // Giant gummy bears sitting on the edge, a good chunk of them on the road.
+            int bears = 0;
+            var bear = PropImport.Load("GummyBear");
+            if (bear && d.EdgeBears != null)
+                foreach (float f in d.EdgeBears)
+                {
+                    int i = Free(f, 20f);
+                    while (i >= 0 && b.Width[i] < 5f) i = Free((b.Dist[i] + 25f) / b.Length, 20f); // not in the narrow parts
+                    if (i < 0) continue;
+                    float side = bears % 2 == 0 ? -1f : 1f;
+                    float height = 4.2f;
+                    var size = bear.bounds.size * height;
+                    float lateral = side * (b.Width[i] - 0.4f);
+                    Vector3 pos = b.RoadPoint(i, lateral) - Vector3.up * 0.1f;
+                    var rot = Quaternion.LookRotation(-b.Right[i] * side, Vector3.up) * Quaternion.Euler(0f, b.R(-25f, 25f), 0f);
+                    var color = GummyColors[(bears * 2 + 1) % GummyColors.Length];
+                    b.AddProp(bear, new[] { PropMaterial(b, $"EdgeBear{bears}", color, null, 0.85f, 0.18f) }, Matrix4x4.TRS(pos, rot, Vector3.one * height));
+                    // Collider lined up with the road and reaching past the wall: no gap where a kart
+                    // could wedge itself between the bear and the wall (and get squeezed out of the track).
+                    float inner = b.Width[i] - 1.5f, outer = b.Width[i] + CurbWidth + 0.6f;
+                    var col = new GameObject($"GummyBearObstacle{bears}");
+                    col.transform.SetParent(root.transform, false);
+                    b.Frame(i, out var roadRight, out var roadUp);
+                    col.transform.SetPositionAndRotation(b.RoadPoint(i, side * (inner + outer) * 0.5f),
+                        Quaternion.LookRotation(Vector3.Cross(roadRight, roadUp), roadUp));
+                    var box = col.AddComponent<BoxCollider>();
+                    box.size = new Vector3(outer - inner, size.y * 0.9f, size.z * 0.8f);
+                    box.center = new Vector3(0f, size.y * 0.45f, 0f);
+                    spots.Add(new TrackHazards.Spot { center = pos, radius = Mathf.Max(size.x, size.z) * 0.45f, distance = b.Dist[i], lateral = lateral, sticky = false });
+                    b.Busy.Add(b.Dist[i]);
+                    bears++;
+                }
+            hazards.spots = spots.ToArray();
+            return $"puddles {puddles}, edge bears {bears}";
+        }
+
         /// <summary>
         /// The Japanese bridge carries the road: stretched to the road width and the design length,
         /// its deck heights (raycast through a temporary collider, smoothed) become the road heights
@@ -656,7 +950,7 @@ namespace SugarRush.EditorTools
             float baseY = Mathf.Min(b.Center[(ic - half + n) % n].y, b.Center[(ic + half) % n].y);
             // Railings just outside the curbs (the source is ~0.9 wide x 1 tall x 2.6 long).
             var size = mesh.bounds.size;
-            float width = 2f * (d.HalfWidth + CurbWidth + 0.6f);
+            float width = 2f * (b.Width[ic] + CurbWidth + 0.6f);
             var matrix = Matrix4x4.TRS(new Vector3(c.x, baseY - 0.15f, c.z), Quaternion.LookRotation(forward, Vector3.up),
                 new Vector3(width / size.x, d.BridgeHeight, d.BridgeLength / size.z));
 
@@ -676,7 +970,6 @@ namespace SugarRush.EditorTools
             // Deck heights along the span, smoothed over the steps, blended in at both ends.
             var raw = new float[2 * half + 1];
             for (int k = -half; k <= half; k++) raw[k + half] = Deck(b.Center[(ic + k + n) % n], b.Center[(ic + k + n) % n].y);
-            b.Hidden = new bool[n];
             for (int k = -half; k <= half; k++)
             {
                 float sum = 0f;
@@ -708,6 +1001,7 @@ namespace SugarRush.EditorTools
                 PropMaterial(b, "BridgeDeck", new Color(0.98f, 0.86f, 0.66f)),
             };
             b.AddProp(mesh, mats, matrix);
+            b.Busy.Add(b.Dist[ic]);
             float peak = float.MinValue;
             foreach (float r in raw) peak = Mathf.Max(peak, r);
             return $"bridge at {ic} m, deck rise {peak - baseY:0.0} m";
@@ -730,7 +1024,7 @@ namespace SugarRush.EditorTools
                 for (int i = 0; i <= sides; i++)
                 {
                     float a = i / (float)sides * Mathf.PI * 2f;
-                    verts.Add(new Vector3(c.x + Mathf.Cos(a) * (c.z + 2f), d.LakeLevel, c.y + Mathf.Sin(a) * (c.z + 2f)));
+                    verts.Add(new Vector3(c.x + Mathf.Cos(a) * (c.z + 4f), d.LakeLevel, c.y + Mathf.Sin(a) * (c.z + 4f)));
                     uvs.Add(Vector2.zero);
                 }
                 for (int i = 0; i < sides; i++) tris.AddRange(new[] { centre, centre + 2 + i, centre + 1 + i });
@@ -1000,7 +1294,7 @@ namespace SugarRush.EditorTools
                 int i = Mathf.FloorToInt(f * n) % n;
                 if (b.Hidden != null && b.Hidden[i]) continue;
                 Vector3 c = b.Center[i], right = b.Right[i];
-                float radius = hw + 3.5f;
+                float radius = b.Width[i] + 3.5f;
                 var halfA = Tube(radius, 0.9f, -0.15f, Mathf.PI * 0.5f, 14, 10);
                 var halfB = Tube(radius, 0.9f, Mathf.PI * 0.5f, Mathf.PI + 0.15f, 14, 10);
                 var m = Matrix4x4.TRS(c + Vector3.up * 0.2f, Quaternion.LookRotation(Vector3.Cross(right, Vector3.up), Vector3.up), Vector3.one);
@@ -1033,7 +1327,7 @@ namespace SugarRush.EditorTools
             {
                 if (b.Hidden != null && b.Hidden[i]) continue;
                 float side = (i / 32) % 2 == 0 ? 1f : -1f;
-                Vector3 pos = b.Center[i] + b.Right[i] * side * (hw + CurbWidth + RailWidth + 1.6f) - Vector3.up * 0.35f;
+                Vector3 pos = b.ProfilePoint(i, new Vector2(side * (hw + CurbWidth + RailWidth + 1.6f), -0.35f));
                 var rot = Quaternion.LookRotation(Vector3.Cross(b.Right[i], Vector3.up), Vector3.up) * Quaternion.Euler(0f, b.R(-8f, 8f), 0f);
                 int kind = donutCount % donuts.Length;
                 b.AddProp(donuts[kind], donutMats[kind], Place(pos, rot, 1.7f), false);
