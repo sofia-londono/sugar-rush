@@ -156,8 +156,8 @@ namespace SugarRush
             float height = flat.y;
             flat.y = 0f;
 
-            // Fell off, or slipped under the road surface (e.g. into the far edge of a jump's gap).
-            fallen = height < -fallenDepth || (height < -1.2f && UnderRoad());
+            // Fell off, dropped into a jump's gap (no road under the racing line here), or slipped under the road.
+            fallen = height < -fallenDepth || (height < -1.5f && !HasRoadBelow(onPath)) || (height < -1.2f && UnderRoad());
             bool far = flat.magnitude > path.HalfWidthAt(PathDistance) + offTrackMargin;
             OffTrack = (fallen || far) && !Finished;
             OffTrackTime = OffTrack ? OffTrackTime + dt : 0f;

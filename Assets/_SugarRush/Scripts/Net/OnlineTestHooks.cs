@@ -14,6 +14,7 @@ namespace SugarRush
     ///   -sr-sp-test      start a single-player race on autopilot and log FPS
     ///   -sr-uncapped     with the tests above: no frame cap / vsync, to see the real headroom
     ///   -sr-quality N    with the tests above: graphics option for this run (0 = Performance, 1 = Quality)
+    ///   -sr-track N      with the tests above: which track (index into Tracks.All)
     /// </summary>
     public class OnlineTestHooks : MonoBehaviour
     {
@@ -38,6 +39,7 @@ namespace SugarRush
                 if (args[i] == "-sr-sp-test") spTest = true;
                 if (args[i] == "-sr-uncapped") uncapped = true;
                 if (args[i] == "-sr-quality" && i + 1 < args.Length) int.TryParse(args[i + 1], out quality);
+                if (args[i] == "-sr-track" && i + 1 < args.Length && int.TryParse(args[i + 1], out int track)) GameSettings.Track = Tracks.Wrap(track);
             }
             if (localTest || spTest) autopilot = true;
             if (joinCode == null && !autopilot && !quick) return;

@@ -59,6 +59,7 @@ namespace SugarRush
             Time.timeScale = 1f;
             Laps = GameSettings.Laps;
             TrackIndex = Tracks.IndexOfScene(gameObject.scene.name);
+            SaveSceneFog();
         }
 
         void OnDestroy()

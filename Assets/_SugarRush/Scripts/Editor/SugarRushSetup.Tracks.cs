@@ -30,6 +30,13 @@ namespace SugarRush.EditorTools
             public (Vector2 lip, float length)[] Gaps;
             /// <summary>Caramel puddles and edge gummy bears, as fractions of the lap.</summary>
             public float[] Puddles, EdgeBears;
+            /// <summary>Pastel fog: colour and linear start/end distances (also the sky colour behind it).</summary>
+            public Color FogColor = new(0.94f, 0.87f, 0.96f);
+            public float FogStart = 90f, FogEnd = 330f;
+            /// <summary>Tunnel of donut arches: starts at the point nearest this XZ spot, for this many metres.</summary>
+            public (Vector2 start, float length) DonutTunnel;
+            /// <summary>Tunnels of tree crowns closing over the road (start spot, length).</summary>
+            public (Vector2 start, float length)[] CrownTunnels;
             /// <summary>Height of the open ground around the track (the road is at the knots' heights).</summary>
             public float GroundLevel = -1.5f;
             public int Seed = 1;
@@ -107,9 +114,11 @@ namespace SugarRush.EditorTools
                 new Vector3(80f, 2f, 55f),
                 new Vector3(45f, 1f, 45f),
                 new Vector3(48f, 0.5f, 10f),    // 19 Japanese bridge over the lake
-                new Vector3(50f, 0.8f, -12f),   // 20 kicker
-                new Vector3(52f, 3.2f, -27f),   // 21 crest: jump 2 over the river
-                new Vector3(54f, -0.5f, -46f),  // 22 landing well below the lip (karts must never reach the far edge from underneath)
+                new Vector3(50f, 0.8f, -12f),   // jump 2: the road steepens into a ramp...
+                new Vector3(51f, 1.4f, -19f),
+                new Vector3(51.6f, 2.8f, -25f), // ...up to the lip (the gap starts just before it, while the road still climbs)
+                new Vector3(52.6f, 0.9f, -34f), // landing, well below the lip: karts fly over it instead of meeting its edge
+                new Vector3(54f, -0.5f, -46f),
                 new Vector3(45f, 0f, -92f),     // hairpin 2: an arc of radius 18 around (27, -92)
                 new Vector3(39.7f, -0.3f, -104.7f),
                 new Vector3(27f, -0.5f, -110f),
@@ -120,16 +129,18 @@ namespace SugarRush.EditorTools
             Widths = new[]
             {
                 6.5f, 6.5f, 6.5f, 6.5f, 6.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f,
-                4.2f, 4f, 4f, 4.2f, 5.5f, 5.5f, 5.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6.5f,
+                4.2f, 4f, 4f, 4.2f, 5.5f, 5.5f, 5.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6.5f,
             },
             Banks = new[]
             {
                 0f, 0f, 10f, 12f, 10f, 4f, 0f, 0f, 0f, 4f, 12f, 15f, 15f, 15f, 12f,
-                0f, 6f, 6f, 4f, 6f, 6f, 0f, 0f, 0f, 0f, 10f, 14f, 14f, 14f, 10f, 4f,
+                0f, 6f, 6f, 4f, 6f, 6f, 0f, 0f, 0f, 0f, 0f, 0f, 10f, 14f, 14f, 14f, 10f, 4f,
             },
-            Gaps = new[] { (new Vector2(51.9f, -26.5f), 8f) },
+            Gaps = new[] { (new Vector2(51.4f, -23.5f), 8f) },
             Puddles = new[] { 0.12f, 0.33f, 0.5f, 0.66f, 0.9f },
             EdgeBears = new[] { 0.08f, 0.27f, 0.45f, 0.6f, 0.75f, 0.95f },
+            DonutTunnel = (new Vector2(0f, 22f), 56f),
+            CrownTunnels = new[] { (new Vector2(118f, -42f), 85f), (new Vector2(135f, 140f), 60f) },
             BridgeNear = new Vector2(48f, 10f),
             BridgeLength = 30f,
             Lake = new[]
@@ -167,6 +178,8 @@ namespace SugarRush.EditorTools
             public bool[] NoGround;
             /// <summary>Half width and signed banking (radians, + = right side up) at each centre sample.</summary>
             public float[] Width, Bank;
+            /// <summary>Centre samples where the road breaks off at a jump gap (lip and landing edges).</summary>
+            public readonly List<int> GapEdges = new();
             /// <summary>Distances (m) the chaos zones keep away from (bridge, gaps, hazards).</summary>
             public readonly List<float> Busy = new();
 
@@ -211,7 +224,8 @@ namespace SugarRush.EditorTools
                 return false;
             }
             readonly List<(Vector3 pos, float radius)> occupied = new();
-            readonly Dictionary<(int, int, Mesh, int, Material, bool), List<Matrix4x4>> props = new();
+            readonly Dictionary<(int, int, float, Mesh, Mesh, int, Material, bool, float, float), List<Matrix4x4>> props = new();
+            readonly Dictionary<(int, int, float, Mesh, Mesh, int, Material, bool, float, float), List<Vector4>> tints = new();
 
             public bool HiddenAtDistance(float d)
             {
@@ -236,18 +250,36 @@ namespace SugarRush.EditorTools
                 return f;
             }
 
-            /// <summary>Queues an instanced prop (every submesh with its material); drawn by <see cref="PropInstancer"/>.</summary>
-            public void AddProp(Mesh mesh, Material[] mats, Matrix4x4 matrix, bool shadows = true)
+            /// <summary>
+            /// Queues an instanced prop (every submesh with its material); drawn by <see cref="PropInstancer"/>.
+            /// Optional lighter <paramref name="lod"/> mesh past <paramref name="lodDistance"/>, a cull
+            /// distance, and the chunk size the copies are grouped by (smaller = finer LOD and culling).
+            /// </summary>
+            public void AddProp(Mesh mesh, Material[] mats, Matrix4x4 matrix, bool shadows = true,
+                Mesh lod = null, float lodDistance = 60f, float cullDistance = 0f, float chunk = 150f, Color? tint = null)
             {
                 Vector3 p = matrix.GetColumn(3);
-                int cx = Mathf.FloorToInt(p.x / 150f), cz = Mathf.FloorToInt(p.z / 150f);
+                int cx = Mathf.FloorToInt(p.x / chunk), cz = Mathf.FloorToInt(p.z / chunk);
                 for (int s = 0; s < mesh.subMeshCount; s++)
                 {
-                    var key = (cx, cz, mesh, s, mats[Mathf.Min(s, mats.Length - 1)], shadows);
+                    var key = (cx, cz, chunk, mesh, lod, s, mats[Mathf.Min(s, mats.Length - 1)], shadows, lodDistance, cullDistance);
                     if (!props.TryGetValue(key, out var list)) props[key] = list = new List<Matrix4x4>();
                     list.Add(matrix);
+                    if (tint.HasValue)
+                    {
+                        if (!tints.TryGetValue(key, out var colours)) tints[key] = colours = new List<Vector4>();
+                        colours.Add(tint.Value);
+                    }
                 }
             }
+
+            /// <summary>
+            /// A one-submesh candy prop drawn with SugarRush/CandyInstanced and its own colour
+            /// (all copies of the mesh share one draw call per chunk, whatever their colours).
+            /// </summary>
+            public void AddTinted(Mesh mesh, Material mat, Matrix4x4 matrix, Color tint, bool shadows = false,
+                Mesh lod = null, float lodDistance = 35f, float cullDistance = 0f, float chunk = 80f) =>
+                AddProp(mesh, new[] { mat }, matrix, shadows, lod, lodDistance, cullDistance, chunk, tint);
 
             /// <summary>One PropInstancer under the track with a batch per chunk + mesh + submesh + material.</summary>
             public int FlushProps(out int instances)
@@ -257,10 +289,12 @@ namespace SugarRush.EditorTools
                 instances = 0;
                 foreach (var (key, list) in props)
                 {
-                    var (_, _, mesh, sub, mat, shadows) = key;
+                    var (_, _, _, mesh, lod, sub, mat, shadows, lodDistance, cullDistance) = key;
                     for (int start = 0; start < list.Count; start += 500)
                     {
                         var matrices = list.GetRange(start, Mathf.Min(500, list.Count - start)).ToArray();
+                        Vector4[] colours = tints.TryGetValue(key, out var tintList) && tintList.Count == list.Count
+                            ? tintList.GetRange(start, matrices.Length).ToArray() : null;
                         var bounds = new Bounds(matrices[0].MultiplyPoint3x4(mesh.bounds.center), Vector3.zero);
                         foreach (var m in matrices)
                         {
@@ -269,12 +303,17 @@ namespace SugarRush.EditorTools
                                 bounds.Encapsulate(m.MultiplyPoint3x4(mb.center + Vector3.Scale(mb.extents,
                                     new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1))));
                         }
-                        batches.Add(new PropInstancer.Batch { mesh = mesh, subMesh = sub, material = mat, bounds = bounds, castShadows = shadows, matrices = matrices });
+                        batches.Add(new PropInstancer.Batch
+                        {
+                            mesh = mesh, lodMesh = lod, subMesh = sub, material = mat, bounds = bounds, castShadows = shadows,
+                            lodDistance = lodDistance, cullDistance = cullDistance, matrices = matrices, colors = colours,
+                        });
                         triangles += (int)mesh.GetIndexCount(sub) / 3 * matrices.Length;
                         if (sub == 0) instances += matrices.Length;
                     }
                 }
                 props.Clear();
+                tints.Clear();
                 if (batches.Count == 0) return 0;
                 var go = new GameObject("Props");
                 go.transform.SetParent(Root, false);
@@ -485,6 +524,7 @@ namespace SugarRush.EditorTools
             path.roadHalfWidth = design.HalfWidth;
             path.halfWidths = new float[pathPoints.Count];
             for (int k = 0; k < pathPoints.Count; k++) path.halfWidths[k] = b.Width[Mathf.RoundToInt(k * PathSpacing) % n];
+            MarkTunnels(b);
             string hazardInfo = BuildHazards(b, path);
 
             design.Decorate(b);
@@ -496,7 +536,14 @@ namespace SugarRush.EditorTools
             string chaosInfo = BuildChaos(path, zones, PickCoinRows(path, zones), $"Rubble_{design.Folder}_");
             AddRaceRig(path);
             var cam = Object.FindFirstObjectByType<KartCamera>().GetComponent<Camera>();
-            cam.backgroundColor = design.Sky;
+            // Pastel fog hides where the forest ends; the sky is the same colour so nothing pops out of it.
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = design.FogColor;
+            RenderSettings.fogStartDistance = design.FogStart;
+            RenderSettings.fogEndDistance = design.FogEnd;
+            cam.backgroundColor = design.FogColor;
+            cam.farClipPlane = design.FogEnd + 20f;
 
             string scenePath = $"{Root}/Scenes/{design.Scene}.unity";
             EditorSceneManager.SaveScene(scene, scenePath);
@@ -608,6 +655,18 @@ namespace SugarRush.EditorTools
             Extrude(b, roadProfile, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
             Extrude(b, curbLeft, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
             Extrude(b, curbRight, 0f, colVerts, colUvs, colTris, skip: b.NoGround);
+            // Solid faces where the road breaks off at a jump: a kart arriving too low hits the
+            // landing edge (and drops into the gap) instead of slipping under the road sheet.
+            foreach (int e in b.GapEdges)
+            {
+                int c0 = colVerts.Count;
+                foreach (var q in new[] { new Vector2(-curb, 0.1f), new Vector2(curb, 0.1f), new Vector2(-curb, -9f), new Vector2(curb, -9f) })
+                {
+                    colVerts.Add(b.ProfilePoint(e, q));
+                    colUvs.Add(Vector2.zero);
+                }
+                colTris.AddRange(new[] { c0, c0 + 2, c0 + 1, c0 + 1, c0 + 2, c0 + 3, c0, c0 + 1, c0 + 2, c0 + 1, c0 + 3, c0 + 2 });
+            }
             var colMesh = SaveMeshAsset(NewMesh("RoadCollider", colVerts, colUvs, colTris), $"{b.AssetDir}/RoadCollider.asset");
             var colGo = new GameObject("RoadCollider");
             colGo.transform.SetParent(b.Root, false);
@@ -803,6 +862,25 @@ namespace SugarRush.EditorTools
             }
         }
 
+        /// <summary>Centre samples covered by a tunnel (start spot + length).</summary>
+        static IEnumerable<int> TunnelSamples(TrackBuild b, (Vector2 start, float length) tunnel)
+        {
+            if (tunnel.length <= 0f) yield break;
+            int start = NearestSample(b, tunnel.start), n = b.Center.Count;
+            for (int k = 0; k <= Mathf.RoundToInt(tunnel.length); k++) yield return (start + k) % n;
+        }
+
+        /// <summary>Ralph and the hazards stay out of the tunnels (he would not fit under the arches).</summary>
+        static void MarkTunnels(TrackBuild b)
+        {
+            var d = b.Design;
+            var all = new List<(Vector2, float)> { d.DonutTunnel };
+            if (d.CrownTunnels != null) all.AddRange(d.CrownTunnels);
+            foreach (var t in all)
+                foreach (int i in TunnelSamples(b, t))
+                    if (i % 10 == 0) b.Busy.Add(b.Dist[i]);
+        }
+
         /// <summary>Jump gaps: from each lip the road (and what karts drive on) stops for the gap length.</summary>
         static string MarkGaps(TrackBuild b)
         {
@@ -812,12 +890,15 @@ namespace SugarRush.EditorTools
             foreach (var (lip, length) in d.Gaps)
             {
                 int start = NearestSample(b, lip);
-                for (int k = 1; k <= Mathf.RoundToInt(length); k++)
+                int last = Mathf.RoundToInt(length);
+                for (int k = 1; k <= last; k++)
                 {
                     int i = (start + k) % n;
                     b.Hidden[i] = true;
                     b.NoGround[i] = true;
                 }
+                b.GapEdges.Add(start);
+                b.GapEdges.Add((start + last + 1) % n);
                 // The lip and the landing: no hazards where karts are in the air or just came down blind.
                 b.Busy.Add(b.Dist[start]);
                 b.Busy.Add(Mathf.Repeat(b.Dist[start] + length + 20f, b.Length));
@@ -905,7 +986,7 @@ namespace SugarRush.EditorTools
             // Giant gummy bears sitting on the edge, a good chunk of them on the road.
             int bears = 0;
             var bear = CodeGummyBear(false);
-            var eyes = PropMaterial(b, "BearEyes", new Color(0.25f, 0.12f, 0.15f), null, 0.9f);
+            var bearMat = CandyMaterial(b, "CandyBear", 0f, 0.85f, 0.18f);
             if (d.EdgeBears != null)
                 foreach (float f in d.EdgeBears)
                 {
@@ -919,7 +1000,7 @@ namespace SugarRush.EditorTools
                     Vector3 pos = b.RoadPoint(i, lateral) - Vector3.up * 0.1f;
                     var rot = Quaternion.LookRotation(-b.Right[i] * side, Vector3.up) * Quaternion.Euler(0f, b.R(-25f, 25f), 0f);
                     var color = GummyColors[(bears * 2 + 1) % GummyColors.Length];
-                    b.AddProp(bear, new[] { PropMaterial(b, $"EdgeBear{bears}", color, null, 0.85f, 0.18f), eyes }, Matrix4x4.TRS(pos, rot, Vector3.one * height));
+                    b.AddTinted(bear, bearMat, Matrix4x4.TRS(pos, rot, Vector3.one * height), color, true);
                     // Collider lined up with the road and reaching past the wall: no gap where a kart
                     // could wedge itself between the bear and the wall (and get squeezed out of the track).
                     float inner = b.Width[i] - 1.5f, outer = b.Width[i] + CurbWidth + 0.6f;
@@ -1075,6 +1156,88 @@ namespace SugarRush.EditorTools
             var mats = new Material[mesh.subMeshCount];
             for (int s = 0; s < mats.Length; s++) mats[s] = PropMaterial(b, $"{id}_{s}", PropImport.SlotColor(mesh, s), null, smoothness);
             return mats;
+        }
+
+        /// <summary>
+        /// The far forest: flat cut-outs of a painted treeline (pastel gummy crowns on cream
+        /// trunks, generated texture with alpha) standing in two rows 75-110 m from the road,
+        /// facing it. Unlit and fogged, so they melt into the pastel haze.
+        /// </summary>
+        static int BuildForestBackdrop(TrackBuild b)
+        {
+            const int w = 512, h = 256;
+            var px = new Color[w * h];
+            var rng = new System.Random(77);
+            float R(float a, float c) => a + (float)rng.NextDouble() * (c - a);
+            void Disc(float cx, float cy, float rx, float ry, Color col)
+            {
+                for (int y = Mathf.Max(0, (int)(cy - ry)); y < Mathf.Min(h, (int)(cy + ry) + 1); y++)
+                    for (int x = (int)(cx - rx); x <= (int)(cx + rx); x++)
+                    {
+                        float dx = (x - cx) / rx, dy = (y - cy) / ry;
+                        if (dx * dx + dy * dy > 1f) continue;
+                        int xx = ((x % w) + w) % w; // wraps, so cut-outs tile side by side
+                        float shade = 0.82f + 0.18f * (1f - dy) * 0.5f;
+                        px[y * w + xx] = new Color(col.r * shade, col.g * shade, col.b * shade, 1f);
+                    }
+            }
+            // Back row (smaller, hazier), then front row; trunks below each crown; a solid hedge at the bottom.
+            for (int row = 0; row < 2; row++)
+                for (int k = 0; k < 16; k++)
+                {
+                    float cx = R(0f, w), size = row == 0 ? R(26f, 40f) : R(36f, 56f), top = row == 0 ? R(150f, 200f) : R(110f, 170f);
+                    var c = Color.Lerp(GummyColors[rng.Next(GummyColors.Length)], new Color(0.9f, 0.85f, 1f), row == 0 ? 0.55f : 0.3f);
+                    for (int y = 0; y < (int)top; y++)
+                        for (int x = (int)cx - 3; x <= (int)cx + 3; x++) px[y * w + ((x % w) + w) % w] = new Color(0.97f, 0.93f, 0.9f, 1f);
+                    for (int d = 0; d < 5; d++) Disc(cx + R(-size * 0.7f, size * 0.7f), top + R(-size * 0.3f, size * 0.4f), size * R(0.6f, 0.9f), size * R(0.5f, 0.7f), c);
+                }
+            for (int y = 0; y < 40; y++)
+                for (int x = 0; x < w; x++)
+                    if (y < 28 + 8 * Mathf.Sin(x * 0.05f)) px[y * w + x] = new Color(0.72f, 0.86f, 0.74f, 1f);
+            EnsureFolder(GeneratedDir);
+            string texPath = $"{GeneratedDir}/GF_ForestBackdrop.png";
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.SetPixels(px);
+            System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            UnityEditor.AssetDatabase.ImportAsset(texPath);
+            var importer = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath(texPath);
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+            var texture = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+
+            var mat = GetMaterial($"{b.MaterialDir}/ForestBackdrop", "Universal Render Pipeline/Unlit", Color.white, texture);
+            mat.SetFloat("_AlphaClip", 1f);
+            mat.SetFloat("_Cutoff", 0.5f);
+            mat.EnableKeyword("_ALPHATEST_ON");
+            mat.SetFloat("_Cull", 0f);
+            mat.enableInstancing = true;
+            UnityEditor.EditorUtility.SetDirty(mat);
+
+            // One quad, 1 x 1, standing on its bottom edge.
+            var quad = new Mesh { name = "BackdropQuad" };
+            quad.SetVertices(new List<Vector3> { new(-0.5f, 0f, 0f), new(0.5f, 0f, 0f), new(-0.5f, 1f, 0f), new(0.5f, 1f, 0f) });
+            quad.SetUVs(0, new List<Vector2> { new(0f, 0f), new(1f, 0f), new(0f, 1f), new(1f, 1f) });
+            quad.SetTriangles(new[] { 0, 2, 1, 1, 2, 3 }, 0);
+            quad.RecalculateNormals();
+            quad.RecalculateBounds();
+            quad = SaveMeshAsset(quad, $"{b.AssetDir}/BackdropQuad.asset");
+
+            int count = 0, n = b.Center.Count;
+            for (int i = 0; i < n; i += 16)
+                foreach (float side in new[] { -1f, 1f })
+                    foreach (float dist in new[] { 78f, 108f })
+                    {
+                        Vector3 pos = b.Center[i] + b.Right[i] * side * (dist + b.R(-6f, 6f));
+                        if (b.RoadDistance(new Vector2(pos.x, pos.z), out _, out _) < dist - 18f) continue; // another part of the track is closer
+                        pos.y = b.GroundHeight(pos.x, pos.z) - 3f;
+                        var face = Quaternion.LookRotation(Vector3.ProjectOnPlane(b.Center[i] - pos, Vector3.up).normalized, Vector3.up);
+                        float width = b.R(34f, 44f), height = width * 0.62f;
+                        b.AddProp(quad, new[] { mat }, Matrix4x4.TRS(pos, face, new Vector3(width, height, 1f)), false);
+                        count++;
+                    }
+            return count;
         }
 
         // ---------------------------------------------------------------- Shapes for decoration
@@ -1252,8 +1415,6 @@ namespace SugarRush.EditorTools
         {
             var gummies = new Material[GummyColors.Length];
             for (int i = 0; i < gummies.Length; i++) gummies[i] = GummyMaterial(b, $"Gummy{i}", GummyColors[i]);
-            var gummyProps = new Material[GummyColors.Length];
-            for (int i = 0; i < gummyProps.Length; i++) gummyProps[i] = PropMaterial(b, $"GummyBear{i}", GummyColors[i], null, 0.85f, 0.18f);
             var stem = GetMaterial($"{b.MaterialDir}/Stem", "Universal Render Pipeline/Lit", new Color(1f, 0.96f, 0.9f));
             // Rainbow swirl for the giant lollipops.
             var swirlColors = new[] { new Color(1f, 0.45f, 0.7f), Color.white, new Color(1f, 0.85f, 0.35f), Color.white, new Color(0.45f, 0.75f, 1f), Color.white };
@@ -1271,7 +1432,7 @@ namespace SugarRush.EditorTools
             var canes = PropImport.Load("CandyCanesLow");
             var bear = CodeGummyBear(false);
             var bearLow = CodeGummyBear(true);
-            var bearEyes = PropMaterial(b, "BearEyes", new Color(0.25f, 0.12f, 0.15f), null, 0.9f);
+            var bearMat = CandyMaterial(b, "CandyBear", 0f, 0.85f, 0.18f);
             var bunny = PropImport.Load("ChocolateBunny");
             var cinnamon = PropImport.Load("CinnamonDelight");
             var donut = DonutArch("Code_DonutSmall", 1f, 0.55f, 11, 14, 8, 14, 6);
@@ -1298,22 +1459,23 @@ namespace SugarRush.EditorTools
             Quaternion Facing(Vector3 from, Vector3 to) => Quaternion.LookRotation(Vector3.ProjectOnPlane(to - from, Vector3.up).normalized, Vector3.up);
             Matrix4x4 Place(Vector3 pos, Quaternion rot, float height) => Matrix4x4.TRS(pos, rot, Vector3.one * height);
 
-            // Gummy-worm arches over the road (two-tone: one material per half).
+            // Donut tunnel: glazed half-donut arches one after another over the road, flavours alternating.
             int arches = 0;
-            foreach (float f in new[] { 0.13f, 0.44f, 0.71f })
             {
-                int i = Mathf.FloorToInt(f * n) % n;
-                if (b.Hidden != null && b.Hidden[i]) continue;
-                Vector3 c = b.Center[i], right = b.Right[i];
-                float radius = b.Width[i] + 3.5f;
-                var halfA = Tube(radius, 0.9f, -0.15f, Mathf.PI * 0.5f, 14, 10);
-                var halfB = Tube(radius, 0.9f, Mathf.PI * 0.5f, Mathf.PI + 0.15f, 14, 10);
-                var m = Matrix4x4.TRS(c + Vector3.up * 0.2f, Quaternion.LookRotation(Vector3.Cross(right, Vector3.up), Vector3.up), Vector3.one);
-                b.Add(halfA, gummies[arches * 2 % gummies.Length], m);
-                b.Add(halfB, gummies[(arches * 2 + 3) % gummies.Length], m);
-                b.Occupy(c + right * radius, 3f);
-                b.Occupy(c - right * radius, 3f);
-                arches++;
+                var samples = new List<int>(TunnelSamples(b, b.Design.DonutTunnel));
+                const float minor = 1.8f;
+                for (int k = 0; k < samples.Count; k += 8)
+                {
+                    int i = samples[k];
+                    float major = b.Width[i] + CurbWidth + RailWidth + 1.4f + minor;
+                    var arch = DonutArch($"Code_DonutArch{Mathf.RoundToInt(major * 10f)}", major, minor, 21, 32, 12, 70, 16, 2.55f);
+                    b.Frame(i, out var right, out var up);
+                    var rot = Quaternion.LookRotation(Vector3.Cross(right, up), up) * Quaternion.Euler(0f, 0f, b.R(-2f, 2f));
+                    b.AddProp(arch, DonutMaterials(b, arches), Matrix4x4.TRS(b.Center[i] - up * 0.35f, rot, Vector3.one));
+                    b.Occupy(b.Center[i] + right * major, 3f);
+                    b.Occupy(b.Center[i] - right * major, 3f);
+                    arches++;
+                }
             }
 
             // Marshmallows and gummy rings floating on the chocolate lake.
@@ -1365,7 +1527,7 @@ namespace SugarRush.EditorTools
                 spot.y = b.GroundHeight(spot.x, spot.z) - 0.2f;
                 var rot = Facing(spot, b.Center[i]) * Quaternion.Euler(0f, b.R(-20f, 20f), 0f);
                 if (giants % 3 == 2 && bunny) b.AddProp(bunny, bunnyMat, Place(spot, rot, b.R(11f, 14f)));
-                else b.AddProp(bear, new[] { gummyProps[(giants * 3 + 1) % gummyProps.Length], bearEyes }, Place(spot, rot, b.R(9f, 12f)));
+                else b.AddTinted(bear, bearMat, Place(spot, rot, b.R(9f, 12f)), GummyColors[(giants * 3 + 1) % GummyColors.Length], true);
                 b.Occupy(spot, 6f);
                 giants++;
             }
@@ -1384,25 +1546,86 @@ namespace SugarRush.EditorTools
                 lollipops++;
             }
 
+            // The dense forest, in layers. Gummy trees: crown materials in every gummy colour, a cream trunk.
+            var treeShapes = new Mesh[3];
+            var treeShapesLow = new Mesh[3];
+            for (int v = 0; v < 3; v++) { treeShapes[v] = CodeGummyTree(v, 0f, false); treeShapesLow[v] = CodeGummyTree(v, 0f, true); }
+            var leanShape = CodeGummyTree(0, 0.6f, false);
+            var leanShapeLow = CodeGummyTree(0, 0.6f, true);
+            var treeMat = CandyMaterial(b, "CandyTree", 0.35f, 0.6f, 0.12f);
+            var inTunnel = new bool[n];
+            if (b.Design.CrownTunnels != null)
+                foreach (var t in b.Design.CrownTunnels)
+                    foreach (int i in TunnelSamples(b, t)) inTunnel[i] = true;
+            var inDonuts = new bool[n];
+            foreach (int i in TunnelSamples(b, b.Design.DonutTunnel)) inDonuts[i] = true;
+            bool NearBusy(int i) => b.HiddenAtDistance(b.Dist[i]) || b.HiddenAtDistance(b.Dist[i] + 8f) || b.HiddenAtDistance(b.Dist[i] - 8f);
+
+            // 1) Giant trees right at the road edges. In the crown tunnels they lean in and their crowns meet over the road.
+            int nearTrees = 0, tunnelTrees = 0;
+            for (int i = 0; i < n; i += 8)
+            {
+                if (inDonuts[i] || NearBusy(i)) continue;
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    bool tunnel = inTunnel[i];
+                    float lateral = b.Width[i] + CurbWidth + RailWidth + (tunnel ? b.R(1.8f, 3f) : b.R(3f, 8f));
+                    int j = (i + (side > 0f ? 3 : 0)) % n; // stagger the two sides
+                    Vector3 pos = b.Center[j] + b.Right[j] * side * lateral;
+                    if (b.RoadDistance(new Vector2(pos.x, pos.z), out _, out _) < b.Width[j] + 2.2f || b.LakeFactor(pos.x, pos.z) > 0f || !b.IsFree(pos, 1.5f)) continue;
+                    pos.y = b.GroundHeight(pos.x, pos.z) - 0.2f;
+                    var crown = b.Pick(GummyColors);
+                    float h = tunnel ? b.R(12f, 15f) : b.R(13f, 21f);
+                    if (tunnel)
+                    {
+                        Vector3 toRoad = -b.Right[j] * side;
+                        var rot = Quaternion.LookRotation(Vector3.Cross(toRoad, Vector3.up), Vector3.up) * Quaternion.Euler(0f, b.R(-12f, 12f), 0f);
+                        b.AddTinted(leanShape, treeMat, Matrix4x4.TRS(pos, rot, Vector3.one * h), crown, false, leanShapeLow, 35f, 300f);
+                        tunnelTrees++;
+                    }
+                    else
+                    {
+                        int v = b.Rng.Next(3);
+                        b.AddTinted(treeShapes[v], treeMat, Matrix4x4.TRS(pos, Yaw(), Vector3.one * h), crown, false, treeShapesLow[v], 35f, 300f);
+                        nearTrees++;
+                    }
+                    b.Occupy(pos, 2.5f);
+                }
+            }
+
+            // 2) Medium trees filling the forest behind them (simple shapes past 60 m, gone past 260 m: the backdrop takes over).
+            int midTrees = 0;
+            for (int i = 0; i < 240; i++)
+            {
+                if (!b.TryPlace(b.Design.HalfWidth + 12f, 75f, 3f, out var p) || b.LakeFactor(p.x, p.z) > 0f) continue;
+                int v = b.Rng.Next(3);
+                b.AddTinted(treeShapes[v], treeMat, Matrix4x4.TRS(p - Vector3.up * 0.2f, Yaw(), Vector3.one * b.R(9f, 16f)),
+                    b.Pick(GummyColors), false, treeShapesLow[v], 30f, 200f);
+                midTrees++;
+            }
+
+            // 3) The far forest: a ring of flat cut-outs (one generated texture) behind everything, fading into the fog.
+            int backdrop = BuildForestBackdrop(b);
+
             // The forest itself: Sugar Rush trees, gummy bears and candy canes, denser near the road.
             int trees = 0, bears = 0, caneCount = 0, rolls = 0;
-            for (int i = 0; i < 190 && tree; i++)
+            for (int i = 0; i < 110 && tree; i++)
             {
                 if (!b.TryPlace(hw + 8f, 105f, 2.5f, out var p) || b.LakeFactor(p.x, p.z) > 0f) continue;
                 float h = b.R(8f, 14f);
-                b.AddProp(tree, b.Pick(treeMats), Matrix4x4.TRS(p - Vector3.up * 0.3f, Yaw(), new Vector3(h * 1.4f, h, h * 1.4f)));
+                b.AddProp(tree, b.Pick(treeMats), Matrix4x4.TRS(p - Vector3.up * 0.3f, Yaw(), new Vector3(h * 1.4f, h, h * 1.4f)), false, null, 60f, 200f, 120f);
                 trees++;
             }
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 70; i++)
             {
                 if (!b.TryPlace(hw + 6f, 80f, 1.4f, out var p) || b.LakeFactor(p.x, p.z) > 0f) continue;
-                b.AddProp(bearLow, new[] { b.Pick(gummyProps), bearEyes }, Place(p - Vector3.up * 0.1f, Yaw(), b.R(1.6f, 3.6f)), false);
+                b.AddTinted(bearLow, bearMat, Place(p - Vector3.up * 0.1f, Yaw(), b.R(1.6f, 3.6f)), b.Pick(GummyColors), false, null, 45f, 160f);
                 bears++;
             }
-            for (int i = 0; i < 70 && canes; i++)
+            for (int i = 0; i < 50 && canes; i++)
             {
                 if (!b.TryPlace(hw + 6f, 75f, 1.4f, out var p) || b.LakeFactor(p.x, p.z) > 0f) continue;
-                b.AddProp(canes, caneMat, Place(p - Vector3.up * 0.2f, Yaw(), b.R(2.5f, 4.5f)), false);
+                b.AddProp(canes, caneMat, Place(p - Vector3.up * 0.2f, Yaw(), b.R(2.5f, 4.5f)), false, null, 60f, 160f, 120f);
                 caneCount++;
             }
             for (int i = 0; i < 12 && cinnamon; i++)
@@ -1411,8 +1634,8 @@ namespace SugarRush.EditorTools
                 b.AddProp(cinnamon, cinnamonMat, Place(p - Vector3.up * 0.4f, Yaw(), b.R(2f, 4.5f)));
                 rolls++;
             }
-            Debug.Log($"[SR] {b.Design.Folder} decor: arches {arches}, giants {giants}, lake floaters {floaters}, donuts {donutCount}, lollipops {lollipops}, " +
-                      $"trees {trees}, gummy bears {bears}, canes {caneCount}, cinnamon rolls {rolls}");
+            Debug.Log($"[SR] {b.Design.Folder} decor: donut arches {arches}, near trees {nearTrees}, tunnel trees {tunnelTrees}, mid trees {midTrees}, backdrop {backdrop}, " +
+                      $"giants {giants}, lake floaters {floaters}, donuts {donutCount}, lollipops {lollipops}, sugar trees {trees}, gummy bears {bears}, canes {caneCount}, cinnamon rolls {rolls}");
         }
     }
 }

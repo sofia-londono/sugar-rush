@@ -30,6 +30,18 @@ namespace SugarRush
         public KartCamera SecondCamera { get; private set; }
 
         bool lowSpecActive;
+        // A track can bring its own fog (spline tracks: pastel haze in its colour); it is kept, only shortened.
+        bool sceneFog;
+        Color sceneFogColor;
+        float sceneFogStart, sceneFogEnd;
+
+        void SaveSceneFog()
+        {
+            sceneFog = RenderSettings.fog;
+            sceneFogColor = RenderSettings.fogColor;
+            sceneFogStart = RenderSettings.fogStartDistance;
+            sceneFogEnd = RenderSettings.fogEndDistance;
+        }
         float savedRenderScale, savedShadowDistance;
         int savedFrameRate, savedVSync;
 
@@ -66,18 +78,21 @@ namespace SugarRush
         void ApplyLowSpec(Camera[] cams, float drawDistance, float renderScale, float shadowDistance, int frameRate)
         {
             lowSpecActive = true;
+            Color fogColor = sceneFog ? sceneFogColor : splitFogColor;
+            float fogEnd = sceneFog ? Mathf.Min(sceneFogEnd, drawDistance * 0.95f) : drawDistance * 0.95f;
+            float fogStart = sceneFog ? Mathf.Min(sceneFogStart, fogEnd * 0.5f) : drawDistance * 0.45f;
             foreach (var cam in cams)
             {
-                cam.farClipPlane = drawDistance;
-                cam.backgroundColor = splitFogColor;
+                cam.farClipPlane = Mathf.Min(drawDistance, fogEnd + 20f);
+                cam.backgroundColor = fogColor;
                 cam.clearFlags = CameraClearFlags.SolidColor;
             }
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = splitFogColor;
-            RenderSettings.fogStartDistance = drawDistance * 0.45f;
-            RenderSettings.fogEndDistance = drawDistance * 0.95f;
+            RenderSettings.fogColor = fogColor;
+            RenderSettings.fogStartDistance = fogStart;
+            RenderSettings.fogEndDistance = fogEnd;
 
             // Track pieces stop casting shadows (karts still do, and the road still receives them).
             var track = GameObject.Find("Track");
@@ -114,7 +129,10 @@ namespace SugarRush
             }
             Application.targetFrameRate = savedFrameRate;
             QualitySettings.vSyncCount = savedVSync;
-            RenderSettings.fog = false;
+            RenderSettings.fog = sceneFog;
+            RenderSettings.fogColor = sceneFogColor;
+            RenderSettings.fogStartDistance = sceneFogStart;
+            RenderSettings.fogEndDistance = sceneFogEnd;
         }
     }
 }
