@@ -156,13 +156,23 @@ namespace SugarRush
             float height = flat.y;
             flat.y = 0f;
 
-            fallen = height < -fallenDepth;
+            // Fell off, or slipped under the road surface (e.g. into the far edge of a jump's gap).
+            fallen = height < -fallenDepth || (height < -1.2f && UnderRoad());
             bool far = flat.magnitude > path.HalfWidthAt(PathDistance) + offTrackMargin;
             OffTrack = (fallen || far) && !Finished;
             OffTrackTime = OffTrack ? OffTrackTime + dt : 0f;
 
             if (OffTrack && OffTrackTime >= (fallen ? fallenReturnDelay : autoReturnDelay))
                 ReturnToTrack();
+        }
+
+        bool UnderRoad()
+        {
+            // From above: raycasts don't see the underside of a mesh collider.
+            float y = transform.position.y;
+            foreach (var h in Physics.RaycastAll(transform.position + Vector3.up * 8f, Vector3.down, 8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (h.collider.name == "RoadCollider" && h.point.y > y + 0.8f) return true;
+            return false;
         }
 
         static bool HasRoadBelow(Vector3 point)

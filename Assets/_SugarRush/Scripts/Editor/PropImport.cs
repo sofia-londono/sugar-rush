@@ -52,14 +52,8 @@ namespace SugarRush.EditorTools
         {
             new() { Id = "SugarTree", Source = "sugar_rush_tree.glb", MaxTriangles = 0, KeepTexture = true, TextureSize = 64 },
             new() { Id = "CandyCanes", Source = "simple_candy_canes.glb", MaxTriangles = 1100, KeepTexture = true },
-            new() { Id = "GummyBear", Source = "red-gummy-bear.zip", ZipModel = "source/GummyBear_V2.fbx", MaxTriangles = 1100 },
-            // Light copies for the forest filler (hundreds of them; the detailed ones are for close-ups and giants).
-            new() { Id = "GummyBearLow", Source = "red-gummy-bear.zip", ZipModel = "source/GummyBear_V2.fbx", MaxTriangles = 280 },
+            // Light copy for the forest filler (hundreds of them).
             new() { Id = "CandyCanesLow", Source = "simple_candy_canes.glb", MaxTriangles = 360, KeepTexture = true },
-            new() { Id = "HalfDonutPink", Source = "half-donuts.zip", ZipModel = "source/donut.fbx", ZipTexture = "textures/donut 1 af.png", MaterialName = "lambert2", MaxTriangles = 900, ColorSlots = true, SmallPart = 0.12f },
-            new() { Id = "HalfDonutChoco", Source = "half-donuts.zip", ZipModel = "source/donut.fbx", ZipTexture = "textures/donut 2 af.png", MaterialName = "la2", MaxTriangles = 900, ColorSlots = true, SmallPart = 0.12f },
-            new() { Id = "HalfDonutBlue", Source = "half-donuts.zip", ZipModel = "source/donut.fbx", ZipTexture = "textures/donut 3 af.png", MaterialName = "lambert4", MaxTriangles = 900, ColorSlots = true, SmallPart = 0.12f },
-            new() { Id = "CroissantDolphin", Source = "croissant-dolphins.zip", ZipModel = "source/All.fbx", ZipTexture = "textures/DolphSnack_Low_polySurface1_BaseColor.png", RendererPrefix = "Dolph", MaxTriangles = 1400, ColorSlots = true, MaxColors = 1 },
             new() { Id = "JapaneseBridge", Source = "japanese_bridge.glb", MaxTriangles = 6000 },
             new() { Id = "ChocolateBunny", Source = "chocolate_easter_bunny.glb", MaxTriangles = 4000 },
             new() { Id = "CinnamonDelight", Source = "cinnamon_delight.glb", MaxTriangles = 900, KeepTexture = true },

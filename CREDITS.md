@@ -32,9 +32,7 @@ Importados con `PropImport` (Editor): mallas simplificadas, pintadas con la pale
   https://sketchfab.com/3d-models/chocolate-easter-bunny-99a623a4cbd84b8488050ac8162705b5 (24.464 → 4.000 triángulos)
 - **Cinnamon Delight** — dcm.3designer (https://sketchfab.com/dcm.3designer), CC BY 4.0
   https://sketchfab.com/3d-models/cinnamon-delight-300aa2d66e4240538191f7632eb717e3 (9.998 → 900 triángulos)
-- **Red Gummy Bear** — autor y enlace PENDIENTES (descargado de Sketchfab como `red-gummy-bear.zip`; el ZIP no trae licencia) (3.148 → 1.100 y 280 triángulos, en 7 colores)
-- **Half Donuts** — autor y enlace PENDIENTES (`half-donuts.zip`) (3 medias donas, ~20.000 → 900 triángulos cada una; chispas como cajitas)
-- **Croissant Dolphins** — autor y enlace PENDIENTES (`croissant-dolphins.zip`; solo los delfines) (8.448 → 1.400 triángulos)
+- Ositos de goma, medias donas, arcos de dona, malvaviscos y aros de goma del lago: hechos por código para este proyecto (`SugarRushSetup.CandyShapes.cs`).
 
 ## Tipografías
 - **Luckiest Guy** — Astigmatic (licencia Apache 2.0) — títulos
