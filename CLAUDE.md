@@ -2,6 +2,33 @@
 
 Juego de carreras de karts inspirado en el circuito de Sugar Rush (Wreck-It Ralph / Ralph el demoledor). Proyecto personal de fan sin fines de lucro: el código está en un repo público, pero el juego no se vende ni se distribuye como producto (IP de Disney).
 
+## Para retomar (leer primero)
+Estado al 2026-10-07 (último commit `32911d6`, rama `main` al día con `origin/main`, árbol limpio):
+- Funciona y está en el repo: un jugador, pantalla dividida (2 jugadores), en línea (Relay/Lobby, partida rápida, salas privadas/públicas), IA con personalidades y dificultad, caos de Ralph con dulces envueltos y martillo de Félix, corredores 3D sentados en sus karts (menú, selección, podio y en carrera), menú principal con recorrido de cámara, mini-mapa, controles táctiles y versión web.
+- Una sola pista: "Map_tgsd" (FBX de Sketchfab, ruta trazada a mano). Todo el código de carrera asume esa pista (ver "Pistas nuevas" abajo).
+- **Versión web publicada** en Vercel: https://sugar-rush-sof12.vercel.app (alias https://sugar-rush-dusky.vercel.app). Pide código de acceso una vez por navegador (ver "Versión web"). **Nunca escribir el código en este archivo, en commits ni en mensajes que se suban**: vive solo en `web-access-code.txt` en el PC de la usuaria.
+
+Próximos pasos, en orden:
+1. **Esperar las pruebas de la usuaria de la web** (no verificadas aún por Claude en un navegador real, por falta de RAM):
+   - Portátil (Chrome/Edge): carga completa, pantalla de código, una carrera, control Logitech (el navegador lo detecta solo después de apretar un botón), FPS aceptables.
+   - Celular en horizontal: botones táctiles, "Acelerar solo" (Opciones), aviso "Gira tu teléfono" en vertical.
+   - En línea: crear sala en un dispositivo y unirse con el código desde otro (navegador ↔ navegador y navegador ↔ copia de Windows/Editor; todo usa Relay por WSS).
+   - Que el récord y el código aceptado sigan ahí al cerrar y volver a abrir (PlayerPrefs en IndexedDB del navegador).
+   - Si algo falla, pedir el mensaje que muestra la pantalla de carga ("No se pudo cargar el juego: ...") o la consola del navegador (F12).
+2. **Generador de pistas con Unity Splines + pista piloto "Bosque de gomitas"** (decisión confirmada: opción a, Splines, en vez del Racing Kit de Kenney). La piloto debe tener todo funcionando: IA, dulces, caos de Ralph, mini-mapa, pantalla dividida y en línea.
+3. **Selector de pista**: en el menú (un jugador y 2 jugadores) y en la sala en línea (elige el anfitrión).
+4. **ALTO: cuando la piloto esté lista, esperar a que la usuaria la pruebe** y diga si le gusta cómo se ve y cómo se maneja. Recién después hacer las demás, una por una: río de chocolate, volcán de soda, montaña de helado (temas que eligió). Ella puede buscar assets de decoración: revisar licencia (CC0 o CC BY, agregar a CREDITS.md), ≤ ~3k triángulos por pieza, GLB/FBX.
+5. Opcionales: medir FPS con "Pilotos en carrera" activado (copia de Windows `-sr-sp-test`); repetir la prueba en línea después de los cambios de Ralph (punto 6) y de los pilotos; iluminación baked.
+
+### Pistas nuevas: lo que hay que tener en cuenta (plan acordado)
+- Paquete `com.unity.splines` **todavía no instalado** (agregarlo al manifest; versión compatible con Unity 6000.3).
+- El generador (Editor, en el estilo de `SugarRushSetup`: todo por código, menú "Sugar Rush/...") debe producir desde el spline lo mismo que hoy sale de la pista FBX: malla de carretera + bordes + MeshCollider, `TrackPath` (puntos cada 4 m, índice 0 = meta, alturas), paredes (`TrackWalls`), parrilla de salida, arco de meta, `ChaosZoneSegments` + `CoinRows` para `RalphChaos`, datos del mini-mapa, puntos de saltos para la IA (`jumpSpeed`/`PlannedSpeed`) y tomas para `MenuCameraTour`. Decoración con instancing, pocas luces, neblina pastel (mismo presupuesto de rendimiento que la pista actual).
+- Hoy hay constantes atadas a la pista actual (p. ej. `Route`, `RouteOverrides`, `JumpLips`, `GuideWalls`, `ChaosZoneSegments` en `SugarRushSetup`, `RacerLineup` en el punto 139): pasar esos datos a un asset por pista en vez de constantes.
+- Probablemente una escena por pista (`SceneNames`, Build Settings) o una escena con la pista cargada según la elección; decidir al empezar.
+- Récords: hoy `best_<vueltas>` (`GameSettings.GetBestTime`); con varias pistas pasar a `best_<pista>_<vueltas>` sin perder los récords existentes de la pista actual.
+- En línea: la pista elegida va en `NetLobby`/`NetRace` desde el anfitrión → subir `OnlineSession.ProtocolVersion` (hoy `"sr2"`).
+- Después de agregar pistas, volver a hacer el build web y publicarlo (el tamaño crece; vigilar los 28 MB actuales).
+
 ## Stack
 - Unity 6000.3.25f1 LTS, URP (Universal 3D), Input System nuevo.
 - Unity CLI + paquete `com.unity.pipeline` para conectar Claude Code al Editor (`unity status`, `unity recompile`, `unity command`).
@@ -19,6 +46,23 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - `Materials`, `Prefabs`, `Scenes`, `Audio`
 - `Scripts/Core` (GameSettings, Loc, KartRoster), `Scripts/Kart`, `Scripts/Race`, `Scripts/AI`, `Scripts/Camera`, `Scripts/Editor`
 - `UI/` — USS, tema, fuente y los scripts de UI (MainMenuUI, RaceUI, KartShowcase, UIKit)
+
+Scripts clave:
+- `Scripts/Core`: `GameSettings` (PlayerPrefs), `Loc` (textos es/en), `KartRoster`, `RaceSetup` (modo un jugador / dividida), `CharacterPuppet` (animación de personajes por código), `AccessGate` (código de acceso web).
+- `Scripts/Kart`: `KartController` (física), `PlayerKartInput` (teclado/gamepad/táctil), `TouchDriving` (estado de los botones táctiles), `KartVisuals`, y de prueba `KartTestPilot`, `KartTrailRecorder`.
+- `Scripts/Race`: `RaceManager` (+ `.Online.cs`, `.Split.cs`), `RaceProgress`, `TrackPath`, `RalphChaos`, `RalphPuppet`, `ResultsPodium`.
+- `Scripts/AI`: `AIKartDriver`, `AIPersonality`, `AIDifficulty`. `Scripts/Audio`: `AudioHub`, `KartAudio`, `SoundLibrary`. `Scripts/Camera`: `KartCamera`.
+- `Scripts/Net`: `OnlineSession` (sesiones Relay/Lobby, `ProtocolVersion`), `NetLobby`, `NetRace`, `NetKart`, `OnlineTestHooks`.
+- `Scripts/Editor`: `SugarRushSetup` (genera todo el contenido), `GlbImport`, `MeshDecimator`, `WebBuild` (build web).
+- `UI/`: `MainMenuUI`, `RaceUI`, `KartShowcase`, `MenuCameraTour`, `RacerLineup`, `TrackMinimap`, `CandyElements`, `UIKit`, `SugarRush.uss`.
+
+Fuera de `Assets/_SugarRush/`:
+- `Assets/WebGLTemplates/SugarRush/index.html` — plantilla de la página web (en el repo).
+- `Tools/web/vercel.json` y `Tools/web/robots.txt` — se copian al build web (en el repo). `Tools/synth_sfx.py` — genera los efectos sintéticos.
+- `AgentScripts/` — scripts de Claude para `unity command eval_file` y pruebas en línea (`net_test.sh`, `quick_test.sh`). Ignorado por git; puede tener basura vieja.
+- `Web/` — salida del build web (ignorado por git; se publica desde ahí; contiene `.vercel/` con el enlace al proyecto de Vercel).
+- `web-access-code.txt` — el código de acceso en texto plano (ignorado por git, solo en el PC de la usuaria). `Assets/_SugarRush/Resources/Web/AccessHash.txt` — su hash, generado por el build (ignorado).
+- `CREDITS.md` — créditos de todos los assets CC BY (actualizar al agregar cualquier modelo/textura/sonido).
 
 ## Assets (CC Attribution — dar crédito, ver CREDITS.md)
 - Karts: "Sugar rush karts | Storybook" por RazyBerry — https://sketchfab.com/3d-models/sugar-rush-karts-storybook-05cffff8f28b4d18965b5b7e0e3b05f3 (~9.6k caras).
@@ -67,6 +111,15 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - Controles táctiles (`TouchDriving` + `RaceUI.BuildTouchControls`): en celulares/tablets (o `TouchDriving.ForceForTesting`): ‹ › a la izquierda; Derrapar, Frenar y Acelerar a la derecha (Acelerar se oculta con "Acelerar solo", opción `GameSettings.AutoAccelerate`, activada por defecto y visible solo en táctil); pausa arriba al centro; tocar el aviso "¿Perdido?" vuelve a la pista. Con táctil, la velocidad y el mini-mapa suben (`hud--touch`). En vertical aparece "Gira tu teléfono" (`UIKit.RotateHint`).
 - Publicación: Vercel CLI desde `./Web`, sin subir el build a GitHub. Proyecto Vercel `sugar-rush` (equipo `sof12`, cuenta sofialp5w-8442): https://sugar-rush-sof12.vercel.app (también https://sugar-rush-dusky.vercel.app; `sugar-rush.vercel.app` es de otra persona). Pasos: "Sugar Rush/Web Build" → `cd Web && npx vercel link --yes --project sugar-rush` (si se borró `.vercel`) → `npx vercel deploy --prod --yes`. Verificar con curl que `Build/*.br` lleguen con `Content-Encoding: br`.
 - Tamaño del primer build: 28,4 MB de descarga (datos 20 MB, wasm 9,5 MB, todo Brotli); 22 min de build en el portátil (la segunda vez es más rápido). Después de instalar un módulo de plataforma hay que reiniciar Unity (si no: "Build target 'WebGL' not supported" al final del build).
+- Cómo funciona el código de acceso, paso a paso: el build lee `web-access-code.txt` (primera línea, mínimo 4 caracteres) → calcula `SHA-256("sugar-rush-gate:" + código en MAYÚSCULAS sin espacios)` → lo escribe en `Resources/Web/AccessHash.txt`, que va dentro del build. En el navegador, `MainMenuUI` abre la página `Gate` si `AccessGate.Locked`; lo escrito se compara por hash y, si coincide, se guarda `accessOk` y no se vuelve a pedir. En el Editor y en la copia de Windows nunca se pide (`AccessGate.ForceForTesting` para probarlo). `accessOk` guarda el hash aceptado, así que al cambiar el código todos deben escribir el nuevo una vez. OJO: si `AccessHash.txt` no existe o está vacío, `Locked` es falso y la web queda **sin código**; por eso hacer el build siempre con `WebBuild.Build()` (que lo genera y falla si falta `web-access-code.txt`), nunca con "Build Profiles" a mano.
+- Reconstruir y publicar (con Unity abierto y conectado):
+  1. Cerrar Chrome y programas pesados (8 GB de RAM; el build usa mucha).
+  2. Ejecutar `SugarRush.EditorTools.WebBuild.Build()` (menú "Sugar Rush/Web Build" o `unity command eval_file` con un script que lo llame y devuelva el texto). Devuelve "Web build OK: X MB ..." o el motivo del fallo.
+  3. `cd Web && npx vercel deploy --prod --yes` (si falta `Web/.vercel`, antes `npx vercel link --yes --project sugar-rush`; si pide sesión, la usuaria corre `! npx vercel login`).
+  4. Verificar: `curl -sI https://sugar-rush-sof12.vercel.app/Build/<archivo>.wasm.br` → `Content-Encoding: br`, `Content-Type: application/wasm`, `Cache-Control: ... immutable`, `X-Robots-Tag`; `/vercel.json` y `/.env.local` → 404; el HTML lleva `noindex`.
+  5. Antes de cualquier commit, `git status` y `git ls-files | grep -i access` → solo `AccessGate.cs` (+ meta). Nunca agregar `Web/`, `web-access-code.txt` ni `AccessHash.txt`.
+- Ya verificado (con curl, 2026-10-07): todos los archivos responden; los `.br` con `Content-Encoding: br` y tipo correcto; caché inmutable en `Build/`; `X-Robots-Tag` en todo; meta `noindex`; archivos privados en 404; el repo no tiene el código ni el hash. **Falta**: probar el juego en navegadores reales (ver "Para retomar").
+- Por qué así: Brotli sin fallback = descarga más chica y sin descompresión en JS (requiere los headers de `vercel.json`); nombres con hash = caché "para siempre" sin servir archivos viejos; stripping Minimal porque Netcode/Multiplayer Services usan reflexión y con más stripping se rompe lo en línea; `devicePixelRatio: 1` por la GPU integrada y los celulares; el código de acceso es solo para que el link no lo use cualquiera (el repo es público, por eso solo va el hash y con sal).
 
 ## Pantalla dividida local (etapa A)
 - Menú "2 jugadores (misma pantalla)" (oculto en celulares: `RaceSetup.SplitScreenAvailable`). Cada asiento se toma con A (control) o Enter (teclado); ← → elige corredor (sin repetir), A/Enter = listo, B/Esc = atrás. Al estar los dos listos arranca la carrera.
@@ -131,6 +184,27 @@ Todo el contenido propio va en `Assets/_SugarRush/`:
 - Cada comando tarda varios segundos en llegar: no sirve para maniobras cronometradas (usar `KartTestPilot`) ni para capturar momentos breves.
 - Con `GetMethod(...).Invoke` se pueden llamar métodos privados de la UI (p. ej. `MainMenuUI.ShowPage`, `RaceUI.SetPaused`) para capturar cada pantalla.
 - `UQueryExtensions.Query<T>(root)` en vez de `root.Query<T>()` dentro de eval (no hay `using`).
+
+## Problemas conocidos y cosas que no olvidar
+- **RAM (8 GB)**: con el Editor + Chrome + Claude Code el Editor deja de responder o el build falla; Claude Code llegó a matar tareas en segundo plano. Pedirle a la usuaria cerrar programas o reiniciar Unity antes de builds largos, pruebas en línea con varias copias o mediciones de FPS.
+- Si Unity está en Play sin que Claude lo haya puesto, preguntar antes de detenerlo.
+- Si un USS se edita desde fuera del Editor, correr `AssetDatabase.Refresh()` antes de Play (si no, no se recarga).
+- Bash: los heredocs con apóstrofes fallan; para ediciones grandes escribir un script Python en el scratchpad y correrlo.
+- `capture_game_view` deja imágenes dentro de `Assets/`: borrarlas (una vez se subió `Assets/seats.png` por error y hubo que quitarla).
+- Modelos de personajes: `BakeMesh` + escala del renderer (ver "Personajes"); el decimador necesita cuádricas acumuladas; las caras traseras de mallas generadas necesitan vértices propios (si no, se ven negras).
+- La malla `mini_map_road` de la pista FBX está rota; la ruta es manual (`Route` + `RouteOverrides`).
+- Sin probar todavía: la web en navegadores reales, FPS con pilotos en carrera, prueba en línea después de los últimos cambios.
+- Seguridad: el repo es público. Nada de códigos, contraseñas, tokens ni `.env` en commits; revisar `git status` antes de cada commit.
+
+## Decisiones tomadas (resumen y por qué)
+- URP en calidad baja + "Rendimiento" por defecto: el portátil de la usuaria tiene GPU integrada (100+ FPS en Rendimiento contra ~30 en Calidad).
+- Todo el contenido se genera por código (`SugarRushSetup`): se puede rehacer desde cero y Claude lo controla sin editar escenas a mano.
+- UI Toolkit por código con Painter2D: sin imágenes ni assets de Disney, liviano y fácil de traducir.
+- En línea: Netcode for GameObjects + Relay/Lobby por WSS, anfitrión-cliente con cada uno simulando su kart: responde al instante y permite jugar entre PC, celular y navegador.
+- Personajes GLB con importador y decimador propios (sin paquetes extra) y animación por código (los modelos no traen animaciones).
+- Ralph: opción "c" (animación por código con su esqueleto), elegida por la usuaria.
+- Pistas nuevas: Unity Splines (opción a) en vez del Racing Kit de Kenney, porque permite pistas con temas propios de Sugar Rush y las mismas piezas de juego (IA, Ralph, mini-mapa) generadas desde los datos del spline.
+- Web en Vercel con código de acceso por hash: el juego es de fan (IP de Disney), no debe quedar público ni indexado.
 
 ## Repositorio
 - GitHub (público): https://github.com/sofia-londono/sugar-rush — rama `main`.
