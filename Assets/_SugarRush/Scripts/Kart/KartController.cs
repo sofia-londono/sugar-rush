@@ -119,6 +119,7 @@ namespace SugarRush
             float sideSpeed = Vector3.Dot(velocity, right);
 
             UpdateDrift(dt);
+            UpdateTricks(dt);
             if (boostTimer > 0f) boostTimer -= dt;
             if (roughTimer > 0f) roughTimer -= dt;
 
@@ -278,6 +279,44 @@ namespace SugarRush
         }
 
         public void Boost(float duration) => boostTimer = Mathf.Max(boostTimer, duration);
+
+        // ------------------------------------------------------------ Tricks
+        [Header("Tricks")]
+        [Tooltip("Turbo for landing a trick (drift pressed in the air).")]
+        public float trickBoost = 1.3f;
+        public float trickSpinTime = 0.45f;
+        /// <summary>A trick was started in this jump; it pays off on landing.</summary>
+        public bool TrickPending { get; private set; }
+        /// <summary>0..1 through the trick spin (for KartVisuals).</summary>
+        public float TrickProgress => TrickPending ? Mathf.Clamp01((Time.time - trickStart) / trickSpinTime) : 0f;
+        public event System.Action TrickLanded;
+        float airTime, trickStart;
+        bool driftWasHeld;
+
+        /// <summary>Pressing drift in the air (after a short hop) starts a spin; landing it gives a turbo.</summary>
+        void UpdateTricks(float dt)
+        {
+            if (!IsGrounded)
+            {
+                airTime += dt;
+                if (!TrickPending && airTime > 0.12f && DriftHeld && !driftWasHeld) { TrickPending = true; trickStart = Time.time; }
+            }
+            else
+            {
+                // Only a real jump counts (not a bump, nor being knocked up by a falling gummy).
+                if (TrickPending)
+                {
+                    TrickPending = false;
+                    if (airTime > 0.45f && roughTimer <= 0f)
+                    {
+                        Boost(trickBoost);
+                        TrickLanded?.Invoke();
+                    }
+                }
+                airTime = 0f;
+            }
+            driftWasHeld = DriftHeld;
+        }
 
         /// <summary>Fraction of the top speed left while driving over rubble.</summary>
         public const float RoughSpeedFactor = 0.42f;

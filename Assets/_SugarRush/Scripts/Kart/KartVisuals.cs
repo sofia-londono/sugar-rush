@@ -43,7 +43,10 @@ namespace SugarRush
             {
                 float targetYaw = kart.IsDrifting ? kart.DriftDirection * driftYaw : 0f;
                 currentYaw = Mathf.Lerp(currentYaw, targetYaw, 1f - Mathf.Exp(-8f * dt));
-                model.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
+                // Trick: a full barrel roll (eased) while the trick is in the air.
+                float t = kart.TrickProgress;
+                float roll = t > 0f ? Mathf.SmoothStep(0f, 360f, t) : 0f;
+                model.localRotation = Quaternion.Euler(0f, currentYaw, roll);
             }
         }
     }

@@ -30,6 +30,16 @@ namespace SugarRush.EditorTools
             public (Vector2 lip, float length)[] Gaps;
             /// <summary>Caramel puddles and edge gummy bears, as fractions of the lap.</summary>
             public float[] Puddles, EdgeBears;
+            /// <summary>Turbo pads and trick ramps (wedges for a jump + trick), as fractions of the lap.</summary>
+            public float[] BoostPads, TrickRamps;
+            /// <summary>Moving obstacles, as fractions of the lap: rolling gum balls, pendulums, gummy bears crossing.</summary>
+            public float[] GumBalls, Pendulums, CrossingBears;
+            /// <summary>Gummies falling from the trees: from the point nearest this spot, for this many metres.</summary>
+            public (Vector2 start, float length) GummyRain;
+            /// <summary>Shortcuts: knots (first and last snap to the main road), half width, how often the AI takes it.</summary>
+            public (Vector3[] knots, float halfWidth, float aiChance)[] Shortcuts;
+            /// <summary>Islands splitting the road in two lanes (widen the road there with Widths): start spot, length, island half width.</summary>
+            public (Vector2 start, float length, float half)[] Forks;
             /// <summary>Pastel fog: colour and linear start/end distances (also the sky colour behind it).</summary>
             public Color FogColor = new(0.94f, 0.87f, 0.96f);
             public float FogStart = 90f, FogEnd = 330f;
@@ -129,7 +139,7 @@ namespace SugarRush.EditorTools
             Widths = new[]
             {
                 6.5f, 6.5f, 6.5f, 6.5f, 6.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f,
-                4.2f, 4f, 4f, 4.2f, 5.5f, 5.5f, 5.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6.5f,
+                4.2f, 4f, 4f, 4.2f, 11f, 11f, 5.5f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6f, 6.5f,
             },
             Banks = new[]
             {
@@ -139,6 +149,20 @@ namespace SugarRush.EditorTools
             Gaps = new[] { (new Vector2(51.4f, -23.5f), 8f) },
             Puddles = new[] { 0.12f, 0.33f, 0.5f, 0.66f, 0.9f },
             EdgeBears = new[] { 0.08f, 0.27f, 0.45f, 0.6f, 0.75f, 0.95f },
+            BoostPads = new[] { 0.1f, 0.21f, 0.44f, 0.58f, 0.81f, 0.95f },
+            TrickRamps = new[] { 0.16f, 0.52f, 0.9f },
+            GumBalls = new[] { 0.3f, 0.86f },
+            Pendulums = new[] { 0.4f, 0.68f },
+            CrossingBears = new[] { 0.25f, 0.62f, 0.97f },
+            GummyRain = (new Vector2(135f, 140f), 50f),
+            // A risky shortcut across the mouth of hairpin 1, through the forest (shorter, tighter, with obstacles).
+            Shortcuts = new[]
+            {
+                (new[] { new Vector3(158.3f, 0f, -46f), new Vector3(154f, 0f, -51f), new Vector3(147f, 0f, -54f), new Vector3(140f, 0f, -55f),
+                         new Vector3(133f, 0f, -54f), new Vector3(126f, 0f, -51f), new Vector3(118.6f, 0f, -46f) }, 3.5f, 0.6f),
+            },
+            // The road splits around an island after the chicane and comes together before the bridge.
+            Forks = new[] { (new Vector2(88f, 50f), 45f, 3.6f) },
             DonutTunnel = (new Vector2(0f, 22f), 56f),
             CrownTunnels = new[] { (new Vector2(118f, -42f), 85f), (new Vector2(135f, 140f), 60f) },
             BridgeNear = new Vector2(48f, 10f),
@@ -179,6 +203,11 @@ namespace SugarRush.EditorTools
             public bool[] NoGround;
             /// <summary>Half width and signed banking (radians, + = right side up) at each centre sample.</summary>
             public float[] Width, Bank;
+            /// <summary>Main road samples with an opening on the left / right (where a shortcut leaves or joins).</summary>
+            public bool[] OpenLeft, OpenRight;
+            public readonly List<ShortcutBuild> Shortcuts = new();
+            /// <summary>Other roads (shortcuts) for distance-to-road queries: points every 2 m.</summary>
+            public readonly List<List<Vector3>> ExtraRoads = new();
             /// <summary>Centre samples where the road breaks off at a jump gap (lip and landing edges).</summary>
             public readonly List<int> GapEdges = new();
             /// <summary>Distances (m) the chaos zones keep away from (bridge, gaps, hazards).</summary>
@@ -341,6 +370,15 @@ namespace SugarRush.EditorTools
                     float d = (a2 + ab * t - xz).sqrMagnitude;
                     if (d < best) { best = d; roadY = Mathf.Lerp(a.y, b.y, t); index = i; }
                 }
+                foreach (var road in ExtraRoads)
+                    for (int i = 0; i + 1 < road.Count; i++)
+                    {
+                        Vector3 a = road[i], b = road[i + 1];
+                        Vector2 a2 = new(a.x, a.z), ab = new(b.x - a.x, b.z - a.z);
+                        float t = Mathf.Clamp01(Vector2.Dot(xz - a2, ab) / Mathf.Max(ab.sqrMagnitude, 1e-4f));
+                        float d = (a2 + ab * t - xz).sqrMagnitude;
+                        if (d < best) { best = d; roadY = Mathf.Lerp(a.y, b.y, t); }
+                    }
                 return Mathf.Sqrt(best);
             }
 
@@ -513,6 +551,7 @@ namespace SugarRush.EditorTools
             b.NoGround = new bool[n];
             string bridgeInfo = PlaceBridge(b, pathPoints);
             string gapInfo = MarkGaps(b);
+            PrepareShortcuts(b);
             int roadTris = BuildRoad(b);
             int groundTris = BuildGround(b);
             BuildLake(b);
@@ -524,17 +563,22 @@ namespace SugarRush.EditorTools
             path.points = pathPoints.ToArray();
             path.roadHalfWidth = design.HalfWidth;
             b.Path = path;
+            string shortcutInfo = BuildShortcuts(b, path);
             path.halfWidths = new float[pathPoints.Count];
             for (int k = 0; k < pathPoints.Count; k++) path.halfWidths[k] = b.Width[Mathf.RoundToInt(k * PathSpacing) % n];
             MarkTunnels(b);
+            // Ralph's stretches first (straight, flat, away from tunnels, the bridge and jumps): everything
+            // placed after them (pads, puddles, moving obstacles...) keeps clear of them.
+            var zones = PickChaosZones(path, 3, b.ExcludedForChaos);
+            foreach (int z in zones) b.Busy.Add(path.DistanceAt(z));
             string hazardInfo = BuildHazards(b, path);
+            hazardInfo += " | " + BuildMovingObstacles(b, path);
 
             design.Decorate(b);
             int decorTris = b.FlushDecor();
             int propTris = b.FlushProps(out int propCount);
 
             BuildFinishLine(path, b.Width[0]);
-            var zones = PickChaosZones(path, 3, b.ExcludedForChaos);
             string chaosInfo = BuildChaos(path, zones, PickCoinRows(path, zones), $"Rubble_{design.Folder}_");
             AddRaceRig(path);
             var cam = Object.FindFirstObjectByType<KartCamera>().GetComponent<Camera>();
@@ -551,7 +595,7 @@ namespace SugarRush.EditorTools
             EditorSceneManager.SaveScene(scene, scenePath);
             AssetDatabase.SaveAssets();
             SetupBuildSettings();
-            return $"{design.Folder}: lap {path.Length:0} m, {path.Count} pts, min radius {minRadius:0.0} m at ({minRadiusAt.x:0},{minRadiusAt.z:0}) | tris road {roadTris}, ground {groundTris}, decor {decorTris}, props {propCount} instances / {propTris} tris | {bridgeInfo} | {gapInfo} | {hazardInfo} | zones {string.Join(",", zones)} | {chaosInfo}";
+            return $"{design.Folder}: lap {path.Length:0} m, {path.Count} pts, min radius {minRadius:0.0} m at ({minRadiusAt.x:0},{minRadiusAt.z:0}) | tris road {roadTris}, ground {groundTris}, decor {decorTris}, props {propCount} instances / {propTris} tris | {bridgeInfo} | {gapInfo} | {shortcutInfo} | {hazardInfo} | zones {string.Join(",", zones)} | {chaosInfo}";
         }
 
         /// <summary>Evenly spaced points along a closed polyline (3D distance), starting at its first point.</summary>
@@ -637,8 +681,16 @@ namespace SugarRush.EditorTools
             var curbLeft = new[] { new Vector2(-curb, 0.1f), new Vector2(-hw, 0.02f) };
             var curbRight = new[] { new Vector2(hw, 0.02f), new Vector2(curb, 0.1f) };
             Extrude(b, roadProfile, 0.1f, verts, uvs, road, skip: b.Hidden);
-            Extrude(b, curbLeft, 1f / 3f, verts, uvs, curbs, skip: b.Hidden);
-            Extrude(b, curbRight, 1f / 3f, verts, uvs, curbs, skip: b.Hidden);
+            // Curbs and rails stop where a shortcut leaves or joins on that side.
+            var skipLeft = new bool[b.Center.Count];
+            var skipRight = new bool[b.Center.Count];
+            for (int i = 0; i < skipLeft.Length; i++)
+            {
+                skipLeft[i] = b.Hidden[i] || b.OpenLeft[i];
+                skipRight[i] = b.Hidden[i] || b.OpenRight[i];
+            }
+            Extrude(b, curbLeft, 1f / 3f, verts, uvs, curbs, skip: skipLeft);
+            Extrude(b, curbRight, 1f / 3f, verts, uvs, curbs, skip: skipRight);
             // Shoulders, with a steep skirt that always reaches below the ground (banked turns lift one edge).
             float skirt = shoulder + 2.5f;
             Extrude(b, new[] { new Vector2(-skirt, -4.5f), new Vector2(-shoulder, -ShoulderDrop), new Vector2(-curb, 0.1f) }, 0f, verts, uvs, grass, worldUV: true, skip: b.Hidden);
@@ -688,7 +740,7 @@ namespace SugarRush.EditorTools
                 new[] { new Vector2(-outer, top), new Vector2(-inner, top) },
                 new[] { new Vector2(-inner, top), new Vector2(-inner, 0.05f) },
             };
-            foreach (var face in faces) Extrude(b, face, 1f / 3f, railVerts, railUvs, railTris, skip: b.Hidden);
+            foreach (var face in faces) Extrude(b, face, 1f / 3f, railVerts, railUvs, railTris, skip: face[0].x < 0f ? skipLeft : skipRight);
             var railMesh = SaveMeshAsset(NewMesh("Rails", railVerts, railUvs, railTris), $"{b.AssetDir}/Rails.asset");
             var rails = new GameObject("Rails");
             rails.transform.SetParent(b.Root, false);
@@ -713,6 +765,7 @@ namespace SugarRush.EditorTools
             for (int i = 0; i < n; i += (int)step)
                 foreach (float side in new[] { -1f, 1f })
                 {
+                    if ((side < 0f ? b.OpenLeft : b.OpenRight)[i]) continue; // a shortcut leaves / joins here
                     float x = b.Width[i] + CurbWidth + 0.1f + thickness * 0.5f; // inner face just inside the rail
                     b.Frame(i, out var right, out var up);
                     Vector3 forward = Vector3.Cross(right, up);
@@ -921,6 +974,7 @@ namespace SugarRush.EditorTools
             var root = new GameObject("TrackHazards");
             var hazards = root.AddComponent<TrackHazards>();
             hazards.path = path;
+            string islandInfo = BuildIslands(b, path, spots, root.transform);
 
             // Slide a spot forward until it is clear of the start, the bridge, the gaps and other hazards.
             int Free(float fraction, float range)
@@ -1019,7 +1073,112 @@ namespace SugarRush.EditorTools
                     bears++;
                 }
             hazards.spots = spots.ToArray();
-            return $"puddles {puddles}, edge bears {bears}";
+
+            // Turbo pads: glowing chevron plates on one side of the road.
+            var padTex = GetGeneratedTexture("GF_BoostPad", 128, (x, y) =>
+            {
+                float u = (x + 0.5f) / 128f, v = (y + 0.5f) / 128f;
+                if (u < 0.08f || u > 0.92f) return new Color(1f, 0.5f, 0.75f);
+                float chevron = Mathf.Repeat(v * 3f - Mathf.Abs(u - 0.5f) * 1.6f, 1f);
+                return chevron < 0.45f ? new Color(1f, 0.95f, 0.55f) : new Color(1f, 0.62f, 0.3f);
+            });
+            var padMat = GetMaterial($"{b.MaterialDir}/BoostPad", "Universal Render Pipeline/Unlit", Color.white, padTex);
+            var padVerts = new List<Vector3>();
+            var padUvs = new List<Vector2>();
+            var padTris = new List<int>();
+            var pads = new List<TrackHazards.Pad>();
+            if (d.BoostPads != null)
+                foreach (float f in d.BoostPads)
+                {
+                    int i = Free(f, 14f);
+                    if (i < 0) continue;
+                    float lateral = (pads.Count % 2 == 0 ? -1f : 1f) * b.Width[i] * 0.4f;
+                    const float halfLength = 2.6f, halfWidth = 1.5f;
+                    int c0 = padVerts.Count;
+                    foreach (var (along, across, u, v) in new[] { (-halfLength, -halfWidth, 0f, 0f), (-halfLength, halfWidth, 1f, 0f), (halfLength, -halfWidth, 0f, 1f), (halfLength, halfWidth, 1f, 1f) })
+                    {
+                        int j = (i + Mathf.RoundToInt(along) + n) % n;
+                        padVerts.Add(b.RoadPoint(j, lateral + across, 0.04f));
+                        padUvs.Add(new Vector2(u, v));
+                    }
+                    padTris.AddRange(new[] { c0, c0 + 2, c0 + 1, c0 + 1, c0 + 2, c0 + 3 });
+                    pads.Add(new TrackHazards.Pad
+                    {
+                        center = b.RoadPoint(i, lateral), forward = Vector3.Cross(b.Right[i], Vector3.up), halfLength = halfLength, halfWidth = halfWidth,
+                        distance = b.Dist[i], lateral = lateral,
+                    });
+                    b.Busy.Add(b.Dist[i]);
+                }
+            if (padVerts.Count > 0)
+            {
+                var padMesh = SaveMeshAsset(NewMesh("BoostPads", padVerts, padUvs, padTris), $"{b.AssetDir}/BoostPads.asset");
+                var padGo = new GameObject("BoostPads");
+                padGo.transform.SetParent(b.Root, false);
+                padGo.AddComponent<MeshFilter>().sharedMesh = padMesh;
+                var mr = padGo.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = padMat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            hazards.boostPads = pads.ToArray();
+
+            // Trick ramps: striped wedges on one side of a straight (optional: hit one to jump and do a trick).
+            var rampVerts = new List<Vector3>();
+            var rampUvs = new List<Vector2>();
+            var rampTris = new List<int>();
+            var ramps = new List<TrackHazards.Pad>();
+            if (d.TrickRamps != null)
+                foreach (float f in d.TrickRamps)
+                {
+                    int i = Free(f, 18f);
+                    // Only on fairly straight road (the wedge is straight).
+                    for (int tries = 0; i >= 0 && tries < 40; tries++)
+                    {
+                        float bend = Vector3.Angle(b.Right[(i - 8 + n) % n], b.Right[(i + 8) % n]);
+                        if (bend < 12f && !b.BusyNear(b.Dist[i], 18f)) break;
+                        i = (i + 4) % n;
+                    }
+                    if (i < 0) continue;
+                    float lateral = (ramps.Count % 2 == 0 ? 1f : -1f) * b.Width[i] * 0.45f;
+                    const float halfWidth = 2.2f, length = 5f, height = 0.9f;
+                    b.Frame(i, out var right, out var up);
+                    Vector3 forward = Vector3.Cross(right, up);
+                    Vector3 c = b.RoadPoint(i, lateral);
+                    Vector3 P(float along, float across, float h) => c + forward * along + right * across + up * h;
+                    // Corners: near edge on the road, far edge raised.
+                    var corners = new[]
+                    {
+                        P(-length * 0.5f, -halfWidth, 0.02f), P(-length * 0.5f, halfWidth, 0.02f),
+                        P(length * 0.5f, -halfWidth, height), P(length * 0.5f, halfWidth, height),
+                        P(length * 0.5f, -halfWidth, -0.2f), P(length * 0.5f, halfWidth, -0.2f),
+                    };
+                    void Face(params int[] idx)
+                    {
+                        int c0 = rampVerts.Count;
+                        for (int k = 0; k < idx.Length; k++)
+                        {
+                            rampVerts.Add(corners[idx[k]]);
+                            rampUvs.Add(new Vector2(k % 2, k / 2));
+                        }
+                        rampTris.AddRange(idx.Length == 4 ? new[] { c0, c0 + 2, c0 + 1, c0 + 1, c0 + 2, c0 + 3 } : new[] { c0, c0 + 1, c0 + 2 });
+                    }
+                    Face(0, 1, 2, 3);     // slope
+                    Face(2, 3, 4, 5);     // back
+                    Face(0, 2, 4);        // sides
+                    Face(1, 5, 3);
+                    ramps.Add(new TrackHazards.Pad { center = c, forward = forward, halfLength = length * 0.5f, halfWidth = halfWidth, distance = b.Dist[i], lateral = lateral });
+                    b.Busy.Add(b.Dist[i]);
+                }
+            if (rampVerts.Count > 0)
+            {
+                var rampMesh = SaveMeshAsset(NewMesh("TrickRamps", rampVerts, rampUvs, rampTris), $"{b.AssetDir}/TrickRamps.asset");
+                var rampGo = new GameObject("TrickRamps");
+                rampGo.transform.SetParent(b.Root, false);
+                rampGo.AddComponent<MeshFilter>().sharedMesh = rampMesh;
+                rampGo.AddComponent<MeshRenderer>().sharedMaterial = b.Mats.Curb;
+                rampGo.AddComponent<MeshCollider>().sharedMesh = rampMesh;
+            }
+            hazards.trickRamps = ramps.ToArray();
+            return $"{islandInfo}, puddles {puddles}, edge bears {bears}, turbo pads {pads.Count}, trick ramps {ramps.Count}";
         }
 
         /// <summary>
@@ -1594,6 +1753,21 @@ namespace SugarRush.EditorTools
                     b.Occupy(pos, 2.5f);
                 }
             }
+
+            // The shortcut runs through the forest: leaning trees close over it.
+            foreach (var sc in b.Shortcuts)
+                for (int i = 8; i + 8 < sc.Center.Count; i += 6)
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        Vector3 pos = sc.Center[i] + sc.Right[i] * side * (sc.HalfWidth + CurbWidth + RailWidth + b.R(1.6f, 2.6f));
+                        if (b.RoadDistance(new Vector2(pos.x, pos.z), out _, out _) < sc.HalfWidth + 1.8f || !b.IsFree(pos, 1.5f)) continue;
+                        pos.y = b.GroundHeight(pos.x, pos.z) - 0.2f;
+                        Vector3 toRoad = -sc.Right[i] * side;
+                        var rot = Quaternion.LookRotation(Vector3.Cross(toRoad, Vector3.up), Vector3.up) * Quaternion.Euler(0f, b.R(-12f, 12f), 0f);
+                        b.AddTinted(leanShape, treeMat, Matrix4x4.TRS(pos, rot, Vector3.one * b.R(10f, 13f)), b.Pick(GummyColors), false, leanShapeLow, 35f, 300f);
+                        b.Occupy(pos, 2.5f);
+                        tunnelTrees++;
+                    }
 
             // 2) Medium trees filling the forest behind them (simple shapes past 60 m, gone past 260 m: the backdrop takes over).
             int midTrees = 0;

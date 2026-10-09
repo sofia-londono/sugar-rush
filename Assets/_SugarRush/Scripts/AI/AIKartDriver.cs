@@ -53,6 +53,7 @@ namespace SugarRush
             kart.highSpeedSteering = 1f;
             difficulty ??= new AIDifficulty.Level();
             noiseSeed = Random.Range(0f, 100f);
+            likesRamps = Random.value < 0.4f + 0.6f * P.aggression;
         }
 
         void OnDestroy()
@@ -87,7 +88,11 @@ namespace SugarRush
             Vector3 right = Vector3.Cross(Vector3.up, dir).normalized;
             float bend = Vector3.Angle(Vector3.ProjectOnPlane(path.DirectionAtDistance(s), Vector3.up), Vector3.ProjectOnPlane(dir, Vector3.up));
             float lane = ChooseLane(manager, path, s, p) * Mathf.Clamp01(1f - bend / 45f);
+            lane = IslandLane(path, s, s + lookAhead, lane);
             Vector3 target = path.PositionAtDistance(s + lookAhead) + right * lane;
+            // Shortcut: follow its own line instead (decided before its entrance, once per lap).
+            UpdateBranch(path, s, p);
+            if (branchIndex >= 0) target = BranchTarget(path, lookAhead);
             Vector3 local = transform.InverseTransformPoint(target);
             float angle = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
             float steer = Mathf.Clamp(angle / 20f + AvoidObstacles(), -1f, 1f);
@@ -97,7 +102,7 @@ namespace SugarRush
             if (planTimer <= 0f)
             {
                 planTimer = PlanInterval;
-                plannedSpeed = PlannedSpeed(path, s, p);
+                plannedSpeed = branchIndex >= 0 ? BranchPlannedSpeed(path, p) : PlannedSpeed(path, s, p);
             }
             float targetSpeed = plannedSpeed;
             if (mistakeTimer > 0f && mistakeKind == 1) targetSpeed = kart.maxSpeed; // missed the braking point
@@ -131,7 +136,87 @@ namespace SugarRush
 
             kart.Throttle = throttle;
             kart.Steer = steer;
-            kart.DriftHeld = false;
+            // Tricks: most drivers press drift once they are properly in the air (steady ones always do).
+            if (kart.IsGrounded) { airTime = 0f; trickRoll = Random.value; }
+            else airTime += dt;
+            kart.DriftHeld = !kart.IsGrounded && airTime > 0.18f && trickRoll < 0.55f + 0.45f * p.consistency;
+        }
+
+        float airTime, trickRoll;
+        bool likesRamps;
+
+        // ------------------------------------------------------------ Shortcuts (TrackPath.branches)
+        int branchIndex = -1, branchCursor, decidedBranch = -1, decidedLap = -1;
+        bool takeBranch;
+
+        /// <summary>
+        /// Before each shortcut's entrance (once per lap) decide whether to take it: daring and
+        /// erratic drivers more often. On it, track the nearest point ahead; off at its far end.
+        /// </summary>
+        void UpdateBranch(TrackPath path, float s, AIPersonality p)
+        {
+            var branches = path.branches;
+            if (branches == null || branches.Length == 0) return;
+            if (branchIndex >= 0)
+            {
+                var pts = branches[branchIndex].points;
+                int best = branchCursor;
+                float bestD = (pts[best] - transform.position).sqrMagnitude;
+                for (int k = branchCursor + 1; k < Mathf.Min(pts.Length, branchCursor + 10); k++)
+                {
+                    float d = (pts[k] - transform.position).sqrMagnitude;
+                    if (d < bestD) { bestD = d; best = k; }
+                }
+                branchCursor = best;
+                if (branchCursor >= pts.Length - 3 || bestD > 15f * 15f) branchIndex = -1; // back on the main road (or lost)
+                return;
+            }
+            for (int k = 0; k < branches.Length; k++)
+            {
+                var br = branches[k];
+                float ahead = Mathf.Repeat(br.joinFrom - s, path.Length);
+                if (ahead > 40f || ahead < 0.5f) continue;
+                if (decidedBranch != k || decidedLap != progress.CompletedLaps)
+                {
+                    decidedBranch = k;
+                    decidedLap = progress.CompletedLaps;
+                    float daring = 0.35f + 0.8f * p.aggression + 0.4f * (1f - p.consistency);
+                    takeBranch = Random.value < br.aiChance * daring;
+                }
+                if (takeBranch && ahead < 8f && br.points != null && br.points.Length > 4)
+                {
+                    branchIndex = k;
+                    branchCursor = 0;
+                }
+            }
+        }
+
+        /// <summary>The point lookAhead metres further along the shortcut (points are 2 m apart).</summary>
+        Vector3 BranchTarget(TrackPath path, float lookAhead)
+        {
+            var br = path.branches[branchIndex];
+            int i = branchCursor + Mathf.CeilToInt(lookAhead / 2f);
+            if (i < br.points.Length) return br.points[i];
+            return path.PositionAtDistance(br.joinTo + (i - br.points.Length + 1) * 2f);
+        }
+
+        /// <summary>Like PlannedSpeed, along the shortcut's own (tighter) line.</summary>
+        float BranchPlannedSpeed(TrackPath path, AIPersonality p)
+        {
+            var pts = path.branches[branchIndex].points;
+            float cornerFactor = p.cornerSpeed * difficulty.cornerScale;
+            float decel = brakingDeceleration * p.lateBraking;
+            float limit = kart.maxSpeed;
+            for (int k = branchCursor; k + 7 < pts.Length && k < branchCursor + 20; k++)
+            {
+                Vector3 a = Vector3.ProjectOnPlane(pts[k + 1] - pts[k], Vector3.up);
+                Vector3 c = Vector3.ProjectOnPlane(pts[k + 7] - pts[k + 6], Vector3.up);
+                float sharpness = Vector3.Angle(a, c);
+                float spotSpeed = Mathf.Lerp(kart.maxSpeed, minCornerSpeed, Mathf.InverseLerp(15f, 80f, sharpness)) * cornerFactor;
+                float ahead = (k - branchCursor) * 2f;
+                limit = Mathf.Min(limit, Mathf.Sqrt(spotSpeed * spotSpeed + 2f * decel * ahead));
+            }
+            return limit;
         }
 
         /// <summary>Gentle rubber band: a little faster when far behind the player, a little slower when far ahead.</summary>
@@ -198,12 +283,35 @@ namespace SugarRush
                 else if (blockLane.HasValue) lane = Mathf.Lerp(lane, blockLane.Value, aggression * 0.7f);
             }
 
-            // Caramel puddles and gummy bears at the edge: pass on the open side.
+            // Turbo pads (and trick ramps, for drivers who like them) pull the lane over; caramel
+            // puddles and gummy bears at the edge push it to their open side (avoiding wins).
             var hazards = TrackHazards.Instance;
+            if (hazards && hazards.PadHint(s, lane, likesRamps, out float pad)) lane = pad;
             if (hazards && hazards.LaneHint(s, lane, out float avoid)) lane = avoid;
 
             float limit = Mathf.Max(0f, path.HalfWidthAt(s) - 1.5f);
             return Mathf.Clamp(lane, -limit, limit);
+        }
+
+        // ------------------------------------------------------------ Islands (the road splits in two)
+        int islandSide;
+
+        /// <summary>
+        /// Approaching or beside an island, aim at the middle of one of its two lanes: the side the
+        /// kart is already on (picked once, 25 m before the tip), never the island itself.
+        /// </summary>
+        float IslandLane(TrackPath path, float s, float target, float lane)
+        {
+            if (!path.IslandAt(target, out var island) && !path.IslandAt(s + 25f, out island) && !path.IslandAt(s, out island))
+            {
+                islandSide = 0;
+                return lane;
+            }
+            if (islandSide == 0)
+                islandSide = Mathf.Abs(lane) > 0.5f ? (int)Mathf.Sign(lane) : (Random.value < 0.5f ? -1 : 1);
+            float d = Mathf.Clamp(path.WrapDistance(target), island.from, island.to);
+            float inner = island.HalfAt(d), outer = path.HalfWidthAt(d);
+            return islandSide * Mathf.Max(inner + 1.6f, (inner + outer) * 0.5f);
         }
 
         static readonly float[] WhiskerAngles = { -30f, -12f, 0f, 12f, 30f };

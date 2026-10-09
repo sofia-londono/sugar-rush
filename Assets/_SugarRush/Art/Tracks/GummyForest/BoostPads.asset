@@ -6,19 +6,19 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Pennant
+  m_Name: BoostPads
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
     firstByte: 0
-    indexCount: 3
+    indexCount: 36
     topology: 0
     baseVertex: 0
     firstVertex: 0
-    vertexCount: 3
+    vertexCount: 24
     localAABB:
-      m_Center: {x: 0, y: -0.5, z: 0}
-      m_Extent: {x: 0.5, y: 0.5, z: 0}
+      m_Center: {x: 68.002686, y: 1.6993865, z: 22.94662}
+      m_Extent: {x: 66.19446, y: 1.8975514, z: 135.5404}
   m_Shapes:
     vertices: []
     shapes: []
@@ -32,13 +32,13 @@ Mesh:
     m_Data: 
   m_MeshCompression: 0
   m_IsReadable: 1
-  m_KeepVertices: 1
-  m_KeepIndices: 1
-  m_IndexFormat: 0
-  m_IndexBuffer: 000001000200
+  m_KeepVertices: 0
+  m_KeepIndices: 0
+  m_IndexFormat: 1
+  m_IndexBuffer: 000000000200000001000000010000000200000003000000040000000600000005000000050000000600000007000000080000000a00000009000000090000000a0000000b0000000c0000000e0000000d0000000d0000000e0000000f000000100000001200000011000000110000001200000013000000140000001600000015000000150000001600000017000000
   m_VertexData:
     serializedVersion: 3
-    m_VertexCount: 3
+    m_VertexCount: 24
     m_Channels:
     - stream: 0
       offset: 0
@@ -57,9 +57,9 @@ Mesh:
       format: 0
       dimension: 0
     - stream: 0
-      offset: 0
+      offset: 24
       format: 0
-      dimension: 0
+      dimension: 2
     - stream: 0
       offset: 0
       format: 0
@@ -96,8 +96,8 @@ Mesh:
       offset: 0
       format: 0
       dimension: 0
-    m_DataSize: 72
-    _typelessdata: 000000bf00000000000000000000000000000000000080bf0000003f00000000000000000000000000000000000080bf00000000000080bf000000000000000000000000000080bf
+    m_DataSize: 768
+    _typelessdata: 2374e73fa5a8b63e0da6cc4278c4483c5ae57f3febead2bc0000000000000000c6cb9440d529983e8dbaca420adc8b3c9ae17f3f9395cebc0000803f00000000ff2e7a400d11f63ebe43d8420adc8b3c9ae17f3f9395cebc000000000000803fc196d640dce0c83ee119d642172fb43c2fdc7f3f0227cabc0000803f0000803f0b82b142ea2e4b40ae7c1e43aef17abd2fda7c3fea4713be00000000000000009bc3b042da482e406d8b1b4388bd88bd275a7d3f500402be0000803f000000006424bd4243f55840ba7c1d4388bd88bd275a7d3f500402be000000000000803f8de5bb428a7e414057931a43ad7594bdbdc97d3f9ce4dfbd0000803f0000803f954805433b346640f625c1c2f145da3da733773f1abf723e000000000000000078320643a68a3440e7a5bbc2893bda3d3348773fa771713e0000803f000000008ffefd429ad562401911bbc2893bda3d3348773fa771713e000000000000803f139b00433c013240d03cb6c2b82fda3d2e5f773f7afa6f3e0000803f0000803fa43941421147703fd19056c0b7ae463b18d97f3f03940cbd00000000000000008f4535421147703fb47567c00ab5543b58d97f3ff5080cbd0000803f00000000b4764342843d3b3f746015c10ab5543b58d97f3ff5080cbd000000000000803f6c863742843d3b3fdb391ac124a4623b97d97f3fce7e0bbd0000803f0000803faa941f42c0c31a3f09dfdac263d9ebbd6bc2783f851d533e00000000000000003fe01842da86cdbd5a19d6c28403f4bd0876783f5064563e0000803f00000000ba5706420ee0063f0530e1c28403f4bd0876783f5064563e000000000000803f939b0242c2eb4abe4eacdbc27c3cfdbd931d783fcf165a3e0000803f0000803f5c835241eb7bf63e2c6de8420716273df4937f3f296425bd0000000000000000d2487d419391a23e19b9e542cf2e513d4e747f3fef6926bd0000803f00000000f20280418549133f6ed1f242cf2e513d4e747f3fef6926bd000000000000803fb8979441d703b53e82c3ef4240c17c3d344c7f3f437427bd0000803f0000803f
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0, y: -0.5, z: 0}
-    m_Extent: {x: 0.5, y: 0.5, z: 0}
+    m_Center: {x: 68.002686, y: 1.6993865, z: 22.94662}
+    m_Extent: {x: 66.19446, y: 1.8975514, z: 135.5404}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
   m_BakedConvexCollisionMesh: 

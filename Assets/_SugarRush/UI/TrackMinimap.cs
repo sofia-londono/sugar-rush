@@ -12,6 +12,7 @@ namespace SugarRush
     public class TrackMinimap : UIElements.VisualElement
     {
         readonly Vector3[] points;
+        readonly List<Vector3[]> shortcuts = new();
         readonly Vector2 min, size;
         readonly List<UIElements.VisualElement> dots = new();
         readonly List<UIElements.VisualElement> marks = new();
@@ -21,6 +22,9 @@ namespace SugarRush
             pickingMode = UIElements.PickingMode.Ignore;
             AddToClassList("minimap");
             points = path.points;
+            if (path.branches != null)
+                foreach (var branch in path.branches)
+                    if (branch.points != null && branch.points.Length > 1) shortcuts.Add(branch.points);
             Vector2 lo = new(float.MaxValue, float.MaxValue), hi = new(float.MinValue, float.MinValue);
             foreach (var p in points)
             {
@@ -60,6 +64,19 @@ namespace SugarRush
                 for (int i = 1; i < points.Length; i++) p.LineTo(ToMap(points[i]));
                 p.ClosePath();
                 p.Stroke();
+            }
+            // Shortcuts: thinner, dashed-looking lavender lines under the main loop.
+            foreach (var line in shortcuts)
+            {
+                foreach (var (width, color) in new[] { (12f, new Color(0.36f, 0.18f, 0.38f, 0.5f)), (6f, new Color(0.8f, 0.68f, 1f)) })
+                {
+                    p.strokeColor = color;
+                    p.lineWidth = width;
+                    p.BeginPath();
+                    p.MoveTo(ToMap(line[0]));
+                    for (int i = 1; i < line.Length; i++) p.LineTo(ToMap(line[i]));
+                    p.Stroke();
+                }
             }
             Loop(22f, new Color(0.36f, 0.18f, 0.38f, 0.6f)); // soft outline
             Loop(15f, Color.white);

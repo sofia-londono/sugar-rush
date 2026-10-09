@@ -13,6 +13,70 @@ namespace SugarRush
         [Tooltip("Optional half width at each point (tracks with narrow stretches); empty = roadHalfWidth everywhere.")]
         public float[] halfWidths;
 
+        /// <summary>
+        /// A separate stretch of road (a shortcut) that leaves the racing line at joinFrom and
+        /// comes back at joinTo (metres along the racing line). Points every 2 m, first and last on
+        /// the main road.
+        /// </summary>
+        [System.Serializable]
+        public class Branch
+        {
+            public Vector3[] points;
+            public float halfWidth = 3.5f;
+            public float joinFrom, joinTo;
+            [Tooltip("How likely a computer driver is to take it (scaled by its daring).")]
+            [Range(0f, 1f)] public float aiChance = 0.5f;
+        }
+
+        /// <summary>An island splitting the road in two lanes (the racing line runs through its middle).</summary>
+        [System.Serializable]
+        public class Island
+        {
+            public float from, to, halfWidth;
+
+            /// <summary>Its half width at a distance inside it (pointed at both ends, like the mesh).</summary>
+            public float HalfAt(float d)
+            {
+                float t = Mathf.InverseLerp(from, to, d);
+                return halfWidth * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * t)), 0.6f);
+            }
+        }
+
+        public Branch[] branches;
+        public Island[] islands;
+
+        /// <summary>Index of the branch this position is on (within its width + margin), or -1.</summary>
+        public int BranchAt(Vector3 position, float margin = 2f)
+        {
+            if (branches == null) return -1;
+            for (int b = 0; b < branches.Length; b++)
+            {
+                var pts = branches[b].points;
+                if (pts == null || pts.Length < 2) continue;
+                float limit = branches[b].halfWidth + margin;
+                // The two ends lie on the main road: only the middle of a branch counts.
+                for (int i = 2; i + 3 < pts.Length; i++)
+                {
+                    Vector3 a = pts[i], c = pts[i + 1], ab = c - a;
+                    float t = Mathf.Clamp01(Vector3.Dot(position - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-4f));
+                    Vector3 d = position - (a + ab * t);
+                    if (Mathf.Abs(d.y) < 4f && new Vector2(d.x, d.z).sqrMagnitude < limit * limit) return b;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>The island at a distance along the path, if any.</summary>
+        public bool IslandAt(float d, out Island island)
+        {
+            island = null;
+            if (islands == null) return false;
+            d = WrapDistance(d);
+            foreach (var i in islands)
+                if (d >= i.from && d <= i.to) { island = i; return true; }
+            return false;
+        }
+
         float[] cumulative;
         float length;
 

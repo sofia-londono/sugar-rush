@@ -141,6 +141,7 @@ namespace SugarRush
 
         void UpdateWrongWay(float dt)
         {
+            if (OnBranch) { wrongWayTimer = 0f; WrongWay = false; return; }
             Vector3 dir = path.Direction(Segment);
             bool goingBackwards = Vector3.Dot(Kart.GetComponent<Rigidbody>().linearVelocity, dir) < -3f
                                   || (Vector3.Dot(transform.forward, dir) < -0.5f && Kart.Speed > 3f);
@@ -157,8 +158,9 @@ namespace SugarRush
             flat.y = 0f;
 
             // Fell off, dropped into a jump's gap (no road under the racing line here), or slipped under the road.
-            fallen = height < -fallenDepth || (height < -1.5f && !HasRoadBelow(onPath)) || (height < -1.2f && UnderRoad());
-            bool far = flat.magnitude > path.HalfWidthAt(PathDistance) + offTrackMargin;
+            OnBranch = path.BranchAt(transform.position) >= 0;
+            fallen = !OnBranch && (height < -fallenDepth || (height < -1.5f && !HasRoadBelow(onPath)) || (height < -1.2f && UnderRoad()));
+            bool far = !OnBranch && flat.magnitude > path.HalfWidthAt(PathDistance) + offTrackMargin;
             OffTrack = (fallen || far) && !Finished;
             OffTrackTime = OffTrack ? OffTrackTime + dt : 0f;
 
@@ -174,6 +176,11 @@ namespace SugarRush
                 if (h.collider.name == "RoadCollider" && h.point.y > y + 0.8f) return true;
             return false;
         }
+
+        static readonly float[] ReturnOffsets = new float[3];
+
+        /// <summary>On a shortcut: far from the racing line and pointing anywhere, and that's fine.</summary>
+        public bool OnBranch { get; private set; }
 
         static bool HasRoadBelow(Vector3 point)
         {
@@ -212,8 +219,17 @@ namespace SugarRush
             Vector3 dir = path.Direction(seg);
 
             // Don't drop two karts on the same spot: shift sideways if someone is already there.
+            // Where an island splits the road, use the middle of one of its two lanes instead.
             Vector3 side = Vector3.Cross(Vector3.up, dir).normalized;
-            foreach (float offset in new[] { 0f, -2.5f, 2.5f })
+            var offsets = ReturnOffsets;
+            offsets[0] = 0f; offsets[1] = -2.5f; offsets[2] = 2.5f;
+            if (path.IslandAt(path.DistanceAt(seg), out var island))
+            {
+                float lane = island.halfWidth + 2.5f;
+                float current = Vector3.Dot(Kart.transform.position - point, side);
+                offsets[0] = current < 0f ? -lane : lane; offsets[1] = -offsets[0]; offsets[2] = offsets[0] * 1.3f;
+            }
+            foreach (float offset in offsets)
             {
                 if (IsSpotFree(point + side * offset)) { point += side * offset; break; }
             }
