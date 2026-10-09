@@ -172,6 +172,7 @@ namespace SugarRush.EditorTools
             public Rect Bounds;
             public System.Random Rng;
             public Materials Mats;
+            public TrackPath Path;
             /// <summary>Centre-line samples where the road is not drawn (bridge, jump gaps).</summary>
             public bool[] Hidden;
             /// <summary>Centre-line samples with nothing to drive on (jump gaps).</summary>
@@ -522,6 +523,7 @@ namespace SugarRush.EditorTools
             var path = pathGo.AddComponent<TrackPath>();
             path.points = pathPoints.ToArray();
             path.roadHalfWidth = design.HalfWidth;
+            b.Path = path;
             path.halfWidths = new float[pathPoints.Count];
             for (int k = 0; k < pathPoints.Count; k++) path.halfWidths[k] = b.Width[Mathf.RoundToInt(k * PathSpacing) % n];
             MarkTunnels(b);
@@ -1634,6 +1636,11 @@ namespace SugarRush.EditorTools
                 b.AddProp(cinnamon, cinnamonMat, Place(p - Vector3.up * 0.4f, Yaw(), b.R(2f, 4.5f)));
                 rolls++;
             }
+            string atmosphere = BuildForestAtmosphere(b,
+                new[] { new Vector2(80f, 160f), new Vector2(140f, -94f), new Vector2(27f, -110f) }, // crowd stands
+                new[] { 0.12f, 0.36f, 0.62f, 0.88f },                                            // bunting across the road
+                new[] { new Vector2(-30f, 40f), new Vector2(80f, -8f) });                         // chocolate fountains
+            Debug.Log($"[SR] {b.Design.Folder} {atmosphere}");
             Debug.Log($"[SR] {b.Design.Folder} decor: donut arches {arches}, near trees {nearTrees}, tunnel trees {tunnelTrees}, mid trees {midTrees}, backdrop {backdrop}, " +
                       $"giants {giants}, lake floaters {floaters}, donuts {donutCount}, lollipops {lollipops}, sugar trees {trees}, gummy bears {bears}, canes {caneCount}, cinnamon rolls {rolls}");
         }
